@@ -222,27 +222,41 @@ function syncPins(users) {
 // ── 채팅 메시지 수신 ─────────────────────────────────────────
 const socket = io();
 
-socket.on('chat-message', ({ id, message, color }) => {
+function showChatBubble(id, message, color) {
   const pin = userPins.get(id);
-  if (!pin) return;
+  if (!pin || !pin.userData.bubbleDiv) return false;
 
-  // 기존 타이머 취소 (이전 말풍선은 즉시 교체)
+  // 기존 타이머 취소
   if (state.chatTimers.has(id)) {
     clearTimeout(state.chatTimers.get(id));
   }
 
-  // 말풍선 업데이트
   const bubbleDiv = pin.userData.bubbleDiv;
   bubbleDiv.textContent = message;
   bubbleDiv.style.borderColor = color;
-  bubbleDiv.style.display = '';
 
-  // 5초 후 삭제 (마지막 메시지 1개만 남김)
+  // 애니메이션 강제 재실행 (기존 메시지 위에 새 메시지가 올 때도 동작)
+  bubbleDiv.style.display = 'none';
+  bubbleDiv.style.animation = 'none';
+  // eslint-disable-next-line no-unused-expressions
+  bubbleDiv.offsetHeight; // reflow 강제
+  bubbleDiv.style.animation = '';
+  bubbleDiv.style.display = 'block';
+
+  // 5초 후 숨김 (마지막 메시지 1개만 유지)
   const timer = setTimeout(() => {
     bubbleDiv.style.display = 'none';
     state.chatTimers.delete(id);
   }, 5000);
   state.chatTimers.set(id, timer);
+  return true;
+}
+
+socket.on('chat-message', ({ id, message, color }) => {
+  // 핀이 아직 생성되지 않은 경우 300ms 후 재시도
+  if (!showChatBubble(id, message, color)) {
+    setTimeout(() => showChatBubble(id, message, color), 300);
+  }
 });
 
 socket.on('joined', ({ color }) => {
