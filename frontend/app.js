@@ -591,6 +591,13 @@ function renderRoomList(query = '') {
   roomMeshes.forEach(m => {
     m.material.opacity = matchRoom(m.userData.room) ? m.userData.originalOpacity : 0.08;
   });
+
+  const badge = document.getElementById('room-count');
+  if (badge) {
+    badge.textContent = filtered.length < ROOMS.length
+      ? `${filtered.length} / ${ROOMS.length}`
+      : ROOMS.length;
+  }
 }
 
 document.getElementById('search-input').addEventListener('input', e => renderRoomList(e.target.value));
