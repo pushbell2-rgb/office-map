@@ -451,6 +451,20 @@ window.addEventListener('keydown', e => {
     debugGrid.visible = next;
     debugGridZ.visible = next;
   }
+
+  // ESC키: pick 모드 종료 / 방 정보 패널 닫기 / 채팅바 닫기
+  if (e.key === 'Escape') {
+    if (state.pickingMode) exitPickMode();
+    document.getElementById('room-info-panel').hidden = true;
+    document.getElementById('chat-bar').hidden = true;
+    return;
+  }
+
+  // ?키: 온보딩 가이드 다시 보기
+  if (!isTyping && e.key === '?') {
+    const ov = document.getElementById('onboard-overlay');
+    ov.hidden = !ov.hidden;
+  }
 });
 
 // ── 채팅 입력 ─────────────────────────────────────────────────
