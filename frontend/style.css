@@ -373,6 +373,28 @@ body { font-family: -apple-system, 'Noto Sans KR', sans-serif; background: var(-
 }
 
 /* ── 복사 토스트 ────────────────────────────────────────────── */
+/* ── 온보딩 가이드 ────────────────────────────────────── */
+.onboard-overlay {
+  position: fixed; inset: 0; z-index: 90;
+  background: rgba(0,0,0,0.7);
+  display: flex; align-items: center; justify-content: center;
+  backdrop-filter: blur(4px);
+}
+.onboard-overlay[hidden] { display: none; }
+.onboard-card {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 20px; padding: 36px 32px;
+  width: 360px; box-shadow: var(--shadow); text-align: center;
+}
+.onboard-title { font-size: 18px; font-weight: 800; margin-bottom: 20px; color: var(--text); }
+.onboard-steps { display: flex; flex-direction: column; gap: 12px; text-align: left; }
+.onboard-step {
+  display: flex; align-items: flex-start; gap: 12px;
+  font-size: 13px; color: var(--text-muted); line-height: 1.5;
+}
+.onboard-step b { color: var(--text); }
+.onboard-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+
 .copy-toast {
   position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
   background: #10b981; color: #fff;

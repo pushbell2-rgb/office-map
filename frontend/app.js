@@ -260,6 +260,16 @@ socket.on('chat-message', ({ id, message, color }) => {
   }
 });
 
+function checkOnboarding() {
+  if (!localStorage.getItem('lf-onboarded')) {
+    document.getElementById('onboard-overlay').hidden = false;
+    document.getElementById('onboard-close').addEventListener('click', () => {
+      document.getElementById('onboard-overlay').hidden = true;
+      localStorage.setItem('lf-onboarded', '1');
+    });
+  }
+}
+
 socket.on('joined', ({ color }) => {
   state.myColor = color;
   state.myId = socket.id;
@@ -268,6 +278,8 @@ socket.on('joined', ({ color }) => {
   socket.emit('set-location', { x: FLOOR.CX, z: FLOOR.CZ });
   // 프로필 버튼 업데이트
   updateProfileBtn();
+  // 온보딩 가이드 (최초 방문 시)
+  if (!urlRoom) checkOnboarding();
   // URL 파라미터 방 처리
   if (urlRoom) {
     setTimeout(() => highlightRoomById(urlRoom), 700);
