@@ -22,8 +22,8 @@ export const ROOMS = [
   // ── 임원/본부장 + 유비케어 좌측 ──
   { id: 'E-6',      name: '임원실',        type: 'edit',    x:  10.13, z: 13.87, w:  5.29, d:  5.17 },
   { id: 'E-5',      name: '본부장실',      type: 'edit',    x:  10.13, z: 20.36, w:  5.29, d:  5.17 },
-  { id: 'M-17',     name: '타이페이',      type: 'ubicare', x:  19.69, z: 14.92, w:  6.59, d:  4.12 },
-  { id: 'M-16',     name: '상하이',        type: 'ubicare', x:  19.69, z: 21.22, w:  6.59, d:  4.12 },
+  { id: 'M-17',     name: '본부장실',      type: 'ubicare', x:  19.69, z: 14.92, w:  6.59, d:  4.12 },
+  { id: 'M-16',     name: '대표실',        type: 'ubicare', x:  19.69, z: 21.22, w:  6.59, d:  4.12 },
   { id: 'M-15',     name: '서울',          type: 'ubicare', x:  29.82, z: 21.22, w:  6.59, d:  4.12 },
 
   // ── 유비케어 중단 ──

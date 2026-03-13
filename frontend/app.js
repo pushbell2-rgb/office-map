@@ -3,20 +3,31 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { ROOMS, ROOM_TYPES } from './map-data.js';
 
-// ── 상수 ────────────────────────────────────────────────────
+// ── 상수 ─────────────────────────────────────────────────────
 const FLOOR = { W: 140, D: 88, CX: 70, CZ: 44 };
-const PIN_BALL_INDEX = 1; // Group children 내 ball 위치
+const PIN_BALL_INDEX = 1;
+const ARROW_STEP = 2.0;
+const EMOJI_LIST = ['🙂','😎','🤔','🥳','😴','🤗','🦊','🐱','🐶','🦁','🐸','🦄','🐼','🎩','🤖'];
 
-
-// ── 상태 (인터랙션·소켓) ──────────────────────────────────
+// ── 상태 ─────────────────────────────────────────────────────
 const state = {
   pickingMode: false,
   hoveredMesh: null,
   flyTarget: null,
   myColor: '#ffffff',
+  myEmoji: '🙂',
+  myName: '익명',
+  myId: null,
+  joined: false,
+  pendingRoom: null,       // URL ?room= 파라미터
+  chatTimers: new Map(),   // userId → timerId (말풍선 자동 삭제용)
 };
 
-// ── Three.js 핵심 객체 ────────────────────────────────────
+// ── URL 파라미터 ──────────────────────────────────────────────
+const urlRoom = new URLSearchParams(location.search).get('room');
+if (urlRoom) state.pendingRoom = urlRoom;
+
+// ── Three.js 핵심 ─────────────────────────────────────────────
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0f172a);
 scene.fog = new THREE.FogExp2(0x0f172a, 0.008);
@@ -48,18 +59,16 @@ const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 const clock = new THREE.Clock();
 
-// ── 씬 초기화 함수들 ──────────────────────────────────────
+// ── 씬 초기화 함수들 ─────────────────────────────────────────
 
 function initLights() {
   scene.add(new THREE.AmbientLight(0xffffff, 0.55));
-
   const sun = new THREE.DirectionalLight(0xffffff, 1.0);
   sun.position.set(FLOOR.CX + 20, 80, FLOOR.CZ + 30);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
   Object.assign(sun.shadow.camera, { near: 0.5, far: 200, left: -100, right: 100, top: 80, bottom: -80 });
   scene.add(sun);
-
   const fill = new THREE.PointLight(0x6366f1, 0.8, 80);
   fill.position.set(20, 20, 20);
   scene.add(fill);
@@ -79,6 +88,7 @@ function initFloor() {
   floor.position.set(FLOOR.CX, 0, FLOOR.CZ);
   floor.receiveShadow = true;
   floor.name = 'floor';
+  floor.visible = false; // 기본 숨김
   scene.add(floor);
   return floor;
 }
@@ -105,11 +115,10 @@ function initRooms() {
     const mesh = new THREE.Mesh(geo, mat);
     mesh.position.set(cx, ROOM_H / 2, cz);
     mesh.castShadow = true;
-    mesh.userData = { room, originalOpacity: mat.opacity };
+    mesh.userData = { room, originalOpacity: mat.opacity, originalEmissive: 0.08 };
     scene.add(mesh);
     meshes.push(mesh);
 
-    // 엣지 아웃라인
     const line = new THREE.LineSegments(
       new THREE.EdgesGeometry(geo),
       new THREE.LineBasicMaterial({ color: typeInfo.hex, transparent: true, opacity: 0.9 })
@@ -117,7 +126,6 @@ function initRooms() {
     line.position.copy(mesh.position);
     scene.add(line);
 
-    // CSS2D 라벨
     const div = document.createElement('div');
     div.className = 'room-label';
     div.innerHTML = `<span class="rl-id">${room.id}</span><span class="rl-name">${room.name}</span>`;
@@ -138,14 +146,14 @@ function makePin(color) {
     new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.3 })
   );
   stem.position.y = 1.4;
-  g.add(stem); // children[0]
+  g.add(stem); // [0]
 
   const ball = new THREE.Mesh(
     new THREE.SphereGeometry(0.75, 20, 20),
     new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.6, roughness: 0.3 })
   );
   ball.position.y = 3.3;
-  g.add(ball); // children[1] = PIN_BALL_INDEX
+  g.add(ball); // [1] = PIN_BALL_INDEX
 
   const shadow = new THREE.Mesh(
     new THREE.CircleGeometry(1.2, 20),
@@ -153,52 +161,109 @@ function makePin(color) {
   );
   shadow.rotation.x = -Math.PI / 2;
   shadow.position.y = 0.02;
-  g.add(shadow); // children[2]
+  g.add(shadow); // [2]
 
   return g;
 }
 
-// ── 씬 구성 실행 ──────────────────────────────────────────
+// ── 씬 구성 실행 ─────────────────────────────────────────────
 initLights();
 const floor = initFloor();
 const roomMeshes = initRooms();
 const userPins = new Map();
 
-// ── 유저 핀 동기화 ────────────────────────────────────────
+// ── 유저 핀 동기화 ────────────────────────────────────────────
 function syncPins(users) {
-  // 퇴장한 유저 핀 제거
   for (const [id, pin] of userPins) {
     if (!users.find(u => u.id === id)) {
       scene.remove(pin);
       userPins.delete(id);
     }
   }
-  // 신규/위치 업데이트
   users.forEach(user => {
     if (user.x === null || user.z === null) return;
+
     if (!userPins.has(user.id)) {
       const pin = makePin(user.color);
+
+      // 이름 + 이모지 라벨
       const nameDiv = document.createElement('div');
       nameDiv.className = 'user-label';
-      nameDiv.textContent = user.name;
       nameDiv.style.borderColor = user.color;
       nameDiv.style.color = user.color;
-      pin.add(new CSS2DObject(nameDiv));
+      const nameLabel = new CSS2DObject(nameDiv);
+      nameLabel.position.set(0, 4.8, 0);
+      pin.add(nameLabel); // [3]
+      pin.userData.nameDiv = nameDiv;
+
+      // 말풍선 (초기 숨김)
+      const bubbleDiv = document.createElement('div');
+      bubbleDiv.className = 'chat-bubble';
+      bubbleDiv.style.display = 'none';
+      const bubbleLabel = new CSS2DObject(bubbleDiv);
+      bubbleLabel.position.set(0, 7.0, 0);
+      pin.add(bubbleLabel); // [4]
+      pin.userData.bubbleDiv = bubbleDiv;
+
       scene.add(pin);
       userPins.set(user.id, pin);
     }
-    userPins.get(user.id).position.set(user.x, 0, user.z);
+
+    const pin = userPins.get(user.id);
+    pin.position.set(user.x, 0, user.z);
+
+    // 이름/이모지 업데이트
+    const emoji = user.emoji || '🙂';
+    pin.userData.nameDiv.innerHTML = `<span style="margin-right:3px">${emoji}</span>${user.name}`;
   });
   renderUserList(users);
 }
 
-// ── Socket.io ──────────────────────────────────────────────
+// ── 채팅 메시지 수신 ─────────────────────────────────────────
 const socket = io();
-socket.on('joined', ({ color }) => { state.myColor = color; });
+
+socket.on('chat-message', ({ id, message, color }) => {
+  const pin = userPins.get(id);
+  if (!pin) return;
+
+  // 기존 타이머 취소 (이전 말풍선은 즉시 교체)
+  if (state.chatTimers.has(id)) {
+    clearTimeout(state.chatTimers.get(id));
+  }
+
+  // 말풍선 업데이트
+  const bubbleDiv = pin.userData.bubbleDiv;
+  bubbleDiv.textContent = message;
+  bubbleDiv.style.borderColor = color;
+  bubbleDiv.style.display = '';
+
+  // 5초 후 삭제 (마지막 메시지 1개만 남김)
+  const timer = setTimeout(() => {
+    bubbleDiv.style.display = 'none';
+    state.chatTimers.delete(id);
+  }, 5000);
+  state.chatTimers.set(id, timer);
+});
+
+socket.on('joined', ({ color }) => {
+  state.myColor = color;
+  state.myId = socket.id;
+  state.joined = true;
+  // 첫 접속 위치: 가운데
+  socket.emit('set-location', { x: FLOOR.CX, z: FLOOR.CZ });
+  // 프로필 버튼 업데이트
+  updateProfileBtn();
+  // URL 파라미터 방 처리
+  if (state.pendingRoom) {
+    setTimeout(() => highlightRoomById(state.pendingRoom), 400);
+    state.pendingRoom = null;
+  }
+});
+
 socket.on('users-update', syncPins);
 socket.on('connect_error', () => console.warn('[소켓] 연결 실패, 재시도 중...'));
 
-// ── 카메라 fly-to ──────────────────────────────────────────
+// ── 카메라 fly-to ─────────────────────────────────────────────
 function flyTo(tx, tz, height = 22) {
   state.flyTarget = {
     pos: new THREE.Vector3(tx, height, tz + 26),
@@ -206,7 +271,26 @@ function flyTo(tx, tz, height = 22) {
   };
 }
 
-// ── 인터랙션: 마우스 이벤트 ──────────────────────────────
+// ── 회의실 하이라이트 ─────────────────────────────────────────
+function highlightRoomById(roomId) {
+  const mesh = roomMeshes.find(m => m.userData.room.id === roomId);
+  if (!mesh) return;
+  flyTo(mesh.userData.room.x + mesh.userData.room.w / 2, mesh.userData.room.z + mesh.userData.room.d / 2);
+  showRoomInfo(mesh.userData.room);
+  // 하이라이트 애니메이션 (3초간)
+  const orig = mesh.userData.originalEmissive;
+  let elapsed = 0;
+  const interval = setInterval(() => {
+    elapsed += 100;
+    mesh.material.emissiveIntensity = 0.08 + 0.5 * Math.abs(Math.sin(elapsed / 200));
+    if (elapsed >= 3000) {
+      clearInterval(interval);
+      mesh.material.emissiveIntensity = orig;
+    }
+  }, 100);
+}
+
+// ── 인터랙션: 마우스 ──────────────────────────────────────────
 function getMouseNDC(e) {
   const rect = renderer.domElement.getBoundingClientRect();
   return {
@@ -254,7 +338,69 @@ renderer.domElement.addEventListener('click', (e) => {
   }
 });
 
-// ── UI: 방 정보 패널 ──────────────────────────────────────
+// ── 키보드 이벤트 ─────────────────────────────────────────────
+window.addEventListener('keydown', e => {
+  const tag = document.activeElement?.tagName;
+  const isTyping = tag === 'INPUT' || tag === 'TEXTAREA';
+
+  // 방향키: 내 위치 이동
+  if (!isTyping && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+    if (!state.joined) return;
+    e.preventDefault();
+    const pin = userPins.get(state.myId);
+    const cx = pin ? pin.position.x : FLOOR.CX;
+    const cz = pin ? pin.position.z : FLOOR.CZ;
+    let nx = cx, nz = cz;
+    if (e.key === 'ArrowUp')    nz -= ARROW_STEP;
+    if (e.key === 'ArrowDown')  nz += ARROW_STEP;
+    if (e.key === 'ArrowLeft')  nx -= ARROW_STEP;
+    if (e.key === 'ArrowRight') nx += ARROW_STEP;
+    nx = Math.max(0, Math.min(FLOOR.W, nx));
+    nz = Math.max(0, Math.min(FLOOR.D, nz));
+    socket.emit('set-location', { x: nx, z: nz });
+    return;
+  }
+
+  // T키: 채팅 입력창 포커스
+  if (!isTyping && (e.key === 't' || e.key === 'T')) {
+    if (!state.joined) return;
+    e.preventDefault();
+    document.getElementById('chat-bar').hidden = false;
+    document.getElementById('chat-input').focus();
+    return;
+  }
+
+  // G키: 디버그 그리드
+  if (!isTyping && (e.key === 'g' || e.key === 'G')) {
+    const next = !debugGrid.visible;
+    debugGrid.visible = next;
+    debugGridZ.visible = next;
+  }
+});
+
+// ── 채팅 입력 ─────────────────────────────────────────────────
+document.getElementById('chat-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    const msg = e.target.value.trim().slice(0, 20);
+    if (msg && state.joined) socket.emit('chat', { message: msg });
+    e.target.value = '';
+    document.getElementById('chat-bar').hidden = true;
+    e.target.blur();
+  }
+  if (e.key === 'Escape') {
+    e.target.value = '';
+    document.getElementById('chat-bar').hidden = true;
+    e.target.blur();
+  }
+});
+
+// ── 도면 토글 ────────────────────────────────────────────────
+document.getElementById('floor-toggle-btn').addEventListener('click', () => {
+  floor.visible = !floor.visible;
+  document.getElementById('floor-toggle-btn').textContent = floor.visible ? '🗺 도면 숨기기' : '🗺 도면 보기';
+});
+
+// ── 방 정보 패널 ─────────────────────────────────────────────
 function showRoomInfo(room) {
   const ti = ROOM_TYPES[room.type];
   const panel = document.getElementById('room-info-panel');
@@ -270,10 +416,11 @@ document.getElementById('room-info-close').onclick = () => {
   document.getElementById('room-info-panel').hidden = true;
 };
 
-// ── UI: 입장 ──────────────────────────────────────────────
+// ── 입장 ─────────────────────────────────────────────────────
 function joinSession() {
   const name = document.getElementById('name-input').value.trim() || '익명';
-  socket.emit('join', { name });
+  state.myName = name;
+  socket.emit('join', { name, emoji: state.myEmoji });
   document.getElementById('join-overlay').hidden = true;
 }
 document.getElementById('join-btn').addEventListener('click', joinSession);
@@ -281,7 +428,13 @@ document.getElementById('name-input').addEventListener('keydown', e => {
   if (e.key === 'Enter') joinSession();
 });
 
-// ── UI: 위치 설정 모드 ────────────────────────────────────
+// URL 파라미터가 있으면 자동 입장 (이름 입력 생략)
+if (urlRoom) {
+  document.getElementById('join-overlay').hidden = true;
+  socket.emit('join', { name: '방문자', emoji: '🙂' });
+}
+
+// ── 위치 설정 모드 ────────────────────────────────────────────
 function enterPickMode() {
   state.pickingMode = true;
   renderer.domElement.style.cursor = 'crosshair';
@@ -302,7 +455,7 @@ document.getElementById('locate-btn').addEventListener('click', () => {
   state.pickingMode ? exitPickMode() : enterPickMode();
 });
 
-// ── UI: 방 목록 & 검색 ───────────────────────────────────
+// ── 방 목록 & 검색 ────────────────────────────────────────────
 function renderRoomList(query = '') {
   const q = query.toLowerCase();
   const matchRoom = r => !q || r.name.toLowerCase().includes(q) || r.id.toLowerCase().includes(q);
@@ -314,6 +467,7 @@ function renderRoomList(query = '') {
       <span class="ri-dot" style="background:${ti.color}"></span>
       <span class="ri-id-sm">${r.id}</span>
       <span class="ri-name-sm">${r.name}</span>
+      <button class="btn-link-room" onclick="copyRoomLink(event,'${r.id}')" title="링크 복사">🔗</button>
     </div>`;
   }).join('');
 
@@ -331,12 +485,24 @@ window.focusRoom = (id) => {
   showRoomInfo(room);
 };
 
-// ── UI: 유저 목록 ─────────────────────────────────────────
+// 방 링크 복사
+window.copyRoomLink = (e, roomId) => {
+  e.stopPropagation();
+  const url = `${location.origin}${location.pathname}?room=${encodeURIComponent(roomId)}`;
+  navigator.clipboard.writeText(url).then(() => {
+    const toast = document.getElementById('copy-toast');
+    toast.hidden = false;
+    setTimeout(() => { toast.hidden = true; }, 2500);
+  });
+};
+
+// ── 유저 목록 ─────────────────────────────────────────────────
 function renderUserList(users) {
   const placed = users.filter(u => u.x !== null);
   document.getElementById('user-count').textContent = placed.length;
   document.getElementById('user-list').innerHTML = placed.map(u => `
     <div class="user-item" onclick="flyToUser(${u.x}, ${u.z})">
+      <span class="u-emoji-icon">${u.emoji || '🙂'}</span>
       <span class="u-dot" style="background:${u.color}"></span>
       <span class="u-name">${u.name}</span>
       <span class="u-go">→ 이동</span>
@@ -345,7 +511,7 @@ function renderUserList(users) {
 }
 window.flyToUser = (x, z) => flyTo(x, z, 18);
 
-// ── 범례 ──────────────────────────────────────────────────
+// ── 범례 ─────────────────────────────────────────────────────
 document.getElementById('legend').innerHTML = Object.entries(ROOM_TYPES).map(([, v]) => `
   <div class="legend-item">
     <span class="legend-dot" style="background:${v.color}"></span>
@@ -353,7 +519,46 @@ document.getElementById('legend').innerHTML = Object.entries(ROOM_TYPES).map(([,
   </div>
 `).join('');
 
-// ── 리사이즈 ──────────────────────────────────────────────
+// ── 프로필 편집 ───────────────────────────────────────────────
+function updateProfileBtn() {
+  document.getElementById('profile-btn').textContent = `${state.myEmoji} ${state.myName}`;
+}
+
+function renderEmojiGrid(gridId) {
+  document.getElementById(gridId).innerHTML = EMOJI_LIST.map((em, i) =>
+    `<button class="emoji-btn ${em === state.myEmoji ? 'selected' : ''}" onclick="selectEmoji(${i})">${em}</button>`
+  ).join('');
+}
+
+window.selectEmoji = (idx) => {
+  state.myEmoji = EMOJI_LIST[idx];
+  renderEmojiGrid('join-emoji-grid');
+  renderEmojiGrid('profile-emoji-grid');
+};
+
+// 초기 이모지 그리드 렌더링
+renderEmojiGrid('join-emoji-grid');
+renderEmojiGrid('profile-emoji-grid');
+
+document.getElementById('profile-btn').addEventListener('click', () => {
+  document.getElementById('profile-name-input').value = state.myName;
+  renderEmojiGrid('profile-emoji-grid');
+  document.getElementById('profile-modal').hidden = false;
+});
+
+document.getElementById('profile-cancel-btn').addEventListener('click', () => {
+  document.getElementById('profile-modal').hidden = true;
+});
+
+document.getElementById('profile-save-btn').addEventListener('click', () => {
+  const name = document.getElementById('profile-name-input').value.trim() || state.myName;
+  state.myName = name;
+  if (state.joined) socket.emit('update-profile', { name, emoji: state.myEmoji });
+  updateProfileBtn();
+  document.getElementById('profile-modal').hidden = true;
+});
+
+// ── 리사이즈 ─────────────────────────────────────────────────
 function onResize() {
   const w = container.clientWidth, h = container.clientHeight;
   renderer.setSize(w, h);
@@ -362,7 +567,18 @@ function onResize() {
   camera.updateProjectionMatrix();
 }
 
-// ── 애니메이션 루프 ───────────────────────────────────────
+// ── 디버그 그리드 (G키) ───────────────────────────────────────
+const debugGrid = new THREE.GridHelper(140, 28, 0xff0000, 0x880000);
+debugGrid.position.set(FLOOR.CX, 0.15, FLOOR.CZ);
+debugGrid.visible = false;
+scene.add(debugGrid);
+
+const debugGridZ = new THREE.GridHelper(88, 22, 0x0044ff, 0x002288);
+debugGridZ.position.set(FLOOR.CX, 0.15, FLOOR.CZ);
+debugGridZ.visible = false;
+scene.add(debugGridZ);
+
+// ── 애니메이션 루프 ───────────────────────────────────────────
 function animate() {
   requestAnimationFrame(animate);
   const t = clock.getElapsedTime();
@@ -382,28 +598,7 @@ function animate() {
   labelRenderer.render(scene, camera);
 }
 
-// ── 디버그 그리드 (G키 토글) ─────────────────────────────
-const debugGrid = new THREE.GridHelper(140, 28, 0xff0000, 0x880000);
-debugGrid.position.set(FLOOR.CX, 0.15, FLOOR.CZ);
-debugGrid.visible = false;
-scene.add(debugGrid);
-
-// 좌표 눈금용 Z축 그리드 (88 단위)
-const debugGridZ = new THREE.GridHelper(88, 22, 0x0044ff, 0x002288);
-debugGridZ.position.set(FLOOR.CX, 0.15, FLOOR.CZ);
-debugGridZ.visible = false;
-scene.add(debugGridZ);
-
-window.addEventListener('keydown', e => {
-  if (e.key === 'g' || e.key === 'G') {
-    const next = !debugGrid.visible;
-    debugGrid.visible = next;
-    debugGridZ.visible = next;
-    console.log(`[디버그] 그리드 ${next ? 'ON 🟥 (빨강=X축/5unit, 파랑=Z축/4unit)' : 'OFF'}`);
-  }
-});
-
-// ── 초기화 ────────────────────────────────────────────────
+// ── 초기화 ───────────────────────────────────────────────────
 window.addEventListener('resize', onResize);
 onResize();
 renderRoomList();
