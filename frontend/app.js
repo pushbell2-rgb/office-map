@@ -21,6 +21,7 @@ const state = {
   joined: false,
   pendingRoom: null,       // URL ?room= 파라미터
   chatTimers: new Map(),   // userId → timerId (말풍선 자동 삭제용)
+  activeFilter: null,      // 타입별 필터 (null = 전체)
 };
 
 // ── URL 파라미터 ──────────────────────────────────────────────
@@ -468,10 +469,32 @@ document.getElementById('locate-btn').addEventListener('click', () => {
   state.pickingMode ? exitPickMode() : enterPickMode();
 });
 
+// ── 타입 필터 ─────────────────────────────────────────────────
+function initTypeFilters() {
+  const wrap = document.getElementById('type-filters');
+  wrap.innerHTML = Object.entries(ROOM_TYPES).map(([type, ti]) =>
+    `<button class="filter-btn" data-type="${type}" onclick="setTypeFilter('${type}')" style="--filter-color:${ti.color}">
+      <span class="filter-dot" style="background:${ti.color}"></span>${ti.label}
+    </button>`
+  ).join('');
+}
+
+window.setTypeFilter = (type) => {
+  state.activeFilter = state.activeFilter === type ? null : type;
+  document.querySelectorAll('.filter-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.type === state.activeFilter);
+  });
+  renderRoomList(document.getElementById('search-input').value);
+};
+
 // ── 방 목록 & 검색 ────────────────────────────────────────────
 function renderRoomList(query = '') {
   const q = query.toLowerCase();
-  const matchRoom = r => !q || r.name.toLowerCase().includes(q) || r.id.toLowerCase().includes(q);
+  const matchRoom = r => {
+    const matchSearch = !q || r.name.toLowerCase().includes(q) || r.id.toLowerCase().includes(q);
+    const matchType = !state.activeFilter || r.type === state.activeFilter;
+    return matchSearch && matchType;
+  };
   const filtered = ROOMS.filter(matchRoom);
 
   document.getElementById('room-list').innerHTML = filtered.map(r => {
@@ -614,5 +637,6 @@ function animate() {
 // ── 초기화 ───────────────────────────────────────────────────
 window.addEventListener('resize', onResize);
 onResize();
+initTypeFilters();
 renderRoomList();
 animate();
