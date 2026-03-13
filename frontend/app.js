@@ -268,9 +268,8 @@ socket.on('joined', ({ color }) => {
   // 프로필 버튼 업데이트
   updateProfileBtn();
   // URL 파라미터 방 처리
-  if (state.pendingRoom) {
-    setTimeout(() => highlightRoomById(state.pendingRoom), 400);
-    state.pendingRoom = null;
+  if (urlRoom) {
+    setTimeout(() => highlightRoomById(urlRoom), 700);
   }
 });
 
