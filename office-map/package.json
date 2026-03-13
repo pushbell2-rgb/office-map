@@ -1,0 +1,15 @@
+{
+  "name": "office-map",
+  "version": "1.0.0",
+  "description": "서울숲 사옥 LF층 3D 회의실 찾기 & 실시간 위치 공유 서비스",
+  "main": "backend/server.js",
+  "scripts": {
+    "start": "node backend/server.js",
+    "dev": "node --watch backend/server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.3",
+    "socket.io": "^4.7.4"
+  },
+  "engines": { "node": ">=18.0.0" }
+}
