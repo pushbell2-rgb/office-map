@@ -173,6 +173,21 @@ const floor = initFloor();
 const roomMeshes = initRooms();
 const userPins = new Map();
 
+// ── 바닥 그리드 (3D 원근감 강화) ──────────────────────────────
+(function initSceneGrid() {
+  // 큰 칸 그리드 (10unit × 10unit) — 아주 연하게
+  const grid = new THREE.GridHelper(
+    Math.max(FLOOR.W, FLOOR.D) * 1.2, 16,
+    0x6366f1, 0x1e293b
+  );
+  grid.position.set(FLOOR.CX, 0.02, FLOOR.CZ);
+  const mat = grid.material;
+  mat.transparent = true;
+  mat.opacity = 0.18;
+  mat.depthWrite = false;
+  scene.add(grid);
+})();
+
 // ── 유저 핀 동기화 ────────────────────────────────────────────
 function syncPins(users) {
   for (const [id, pin] of userPins) {
