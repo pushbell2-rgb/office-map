@@ -198,7 +198,8 @@ body { font-family: -apple-system, 'Noto Sans KR', sans-serif; background: var(-
 .ri-close:hover { color: var(--text); }
 .ri-id { font-size: 11px; color: var(--text-muted); margin-bottom: 2px; }
 .ri-name { font-size: 18px; font-weight: 800; margin-bottom: 4px; }
-.ri-type { font-size: 12px; margin-bottom: 12px; }
+.ri-type { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; margin-bottom: 14px; }
+.ri-type-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 .btn-nav {
   display: block; width: 100%; padding: 8px;
   background: var(--accent); color: #fff;

@@ -496,7 +496,8 @@ function showRoomInfo(room) {
   panel.style.borderTopColor = ti.color;
   panel.querySelector('.ri-id').textContent = room.id;
   panel.querySelector('.ri-name').textContent = room.name;
-  panel.querySelector('.ri-type').textContent = ti.label;
+  panel.querySelector('.ri-type').innerHTML =
+    `<span class="ri-type-dot" style="background:${ti.color}"></span>${ti.label}`;
   panel.querySelector('.ri-type').style.color = ti.color;
   panel.querySelector('.ri-nav').onclick = () => flyTo(room.x + room.w / 2, room.z + room.d / 2);
   panel.hidden = false;
