@@ -763,3 +763,8 @@ onResize();
 initTypeFilters();
 renderRoomList();
 animate();
+
+// 입장 오버레이가 표시될 때 이름 입력창 자동 포커스
+if (!urlRoom) {
+  setTimeout(() => document.getElementById('name-input').focus(), 100);
+}
