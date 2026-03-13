@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:hackathon-gamma-ebon.vercel.app)",
+      "Bash(pkill -f \"node backend/server.js\" 2>/dev/null; echo \"서버 종료\")"
+    ]
+  }
+}

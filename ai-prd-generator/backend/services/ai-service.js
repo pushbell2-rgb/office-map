@@ -1,6 +1,6 @@
-const Anthropic = require('@anthropic-ai/sdk');
+const OpenAI = require('openai');
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 const SECTION_KEYS = [
   'executiveSummary',
@@ -25,7 +25,7 @@ const SECTION_LABELS = {
 };
 
 function buildSystemPrompt() {
-  return `You are an expert Product Manager who writes clear, structured PRDs.
+  return `You are an expert Product Manager who writes concise, structured PRDs.
 You MUST respond with a valid JSON object only — no markdown fences, no extra text.
 
 The JSON must have exactly these 8 keys:
@@ -38,15 +38,16 @@ The JSON must have exactly these 8 keys:
 - technicalConsiderations
 - risksAndMitigation
 
-Each value is a Markdown string (use headers, bullet lists, tables as appropriate).
-Write in Korean. Be specific, practical, and concise.`;
+IMPORTANT: This is a hackathon demo. Keep each section to 2-3 sentences maximum.
+Each value must be under 100 characters. Be extremely concise.
+Write in Korean.`;
 }
 
 function buildUserPrompt(idea, targetUser, category) {
   const lines = [`서비스 아이디어: ${idea}`];
   if (targetUser) lines.push(`타겟 사용자: ${targetUser}`);
   if (category) lines.push(`산업군/카테고리: ${category}`);
-  return lines.join('\n') + '\n\n이 아이디어에 대한 PRD를 작성해주세요.';
+  return lines.join('\n') + '\n\n이 아이디어에 대한 간결한 PRD를 작성해주세요.';
 }
 
 function buildMarkdown(prd) {
@@ -58,18 +59,18 @@ function buildMarkdown(prd) {
 async function generatePRD(idea, targetUser = '', category = '') {
   console.log('[AI] PRD 생성 요청:', { idea: idea.slice(0, 50) });
 
-  const message = await client.messages.create({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 4096,
-    temperature: 0.7,
-    system: buildSystemPrompt(),
-    messages: [{ role: 'user', content: buildUserPrompt(idea, targetUser, category) }],
+  const response = await client.chat.completions.create({
+    model: 'gpt-4o-mini',
+    max_tokens: 1000,
+    messages: [
+      { role: 'system', content: buildSystemPrompt() },
+      { role: 'user', content: buildUserPrompt(idea, targetUser, category) },
+    ],
   });
 
-  const raw = message.content[0].text.trim();
+  const raw = response.choices[0].message.content.trim();
   const prd = JSON.parse(raw);
 
-  // 필수 키 검증
   for (const key of SECTION_KEYS) {
     if (!prd[key]) throw new Error(`AI 응답에 '${key}' 섹션이 누락되었습니다.`);
   }
@@ -85,16 +86,15 @@ async function regenerateSection(key, idea, targetUser = '', category = '') {
   console.log('[AI] 섹션 재생성 요청:', key);
 
   const sectionLabel = SECTION_LABELS[key];
-  const prompt = `${buildUserPrompt(idea, targetUser, category)}\n\n위 아이디어에 대해 PRD의 "${sectionLabel}" 섹션만 Markdown 형식으로 작성해주세요. JSON 없이 Markdown 텍스트만 반환하세요.`;
+  const prompt = `${buildUserPrompt(idea, targetUser, category)}\n\n위 아이디어의 PRD에서 "${sectionLabel}" 섹션만 2-3문장으로 간결하게 작성해주세요. Markdown 텍스트만 반환하세요.`;
 
-  const message = await client.messages.create({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 1024,
-    temperature: 0.7,
+  const response = await client.chat.completions.create({
+    model: 'gpt-4o-mini',
+    max_tokens: 200,
     messages: [{ role: 'user', content: prompt }],
   });
 
-  const content = message.content[0].text.trim();
+  const content = response.choices[0].message.content.trim();
   console.log('[AI] 섹션 재생성 완료:', key);
   return content;
 }

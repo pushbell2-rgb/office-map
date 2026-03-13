@@ -4,8 +4,8 @@ const cors = require('cors');
 const path = require('path');
 
 // API 키 검증
-if (!process.env.ANTHROPIC_API_KEY) {
-  console.error('[서버] 오류: ANTHROPIC_API_KEY 환경 변수가 설정되지 않았습니다.');
+if (!process.env.OPENAI_API_KEY) {
+  console.error('[서버] 오류: OPENAI_API_KEY 환경 변수가 설정되지 않았습니다.');
   console.error('[서버] .env.example을 참고하여 .env 파일을 생성해주세요.');
   process.exit(1);
 }
