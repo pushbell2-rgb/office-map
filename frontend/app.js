@@ -381,6 +381,27 @@ function animate() {
   labelRenderer.render(scene, camera);
 }
 
+// ── 디버그 그리드 (G키 토글) ─────────────────────────────
+const debugGrid = new THREE.GridHelper(140, 28, 0xff0000, 0x880000);
+debugGrid.position.set(FLOOR.CX, 0.15, FLOOR.CZ);
+debugGrid.visible = false;
+scene.add(debugGrid);
+
+// 좌표 눈금용 Z축 그리드 (88 단위)
+const debugGridZ = new THREE.GridHelper(88, 22, 0x0044ff, 0x002288);
+debugGridZ.position.set(FLOOR.CX, 0.15, FLOOR.CZ);
+debugGridZ.visible = false;
+scene.add(debugGridZ);
+
+window.addEventListener('keydown', e => {
+  if (e.key === 'g' || e.key === 'G') {
+    const next = !debugGrid.visible;
+    debugGrid.visible = next;
+    debugGridZ.visible = next;
+    console.log(`[디버그] 그리드 ${next ? 'ON 🟥 (빨강=X축/5unit, 파랑=Z축/4unit)' : 'OFF'}`);
+  }
+});
+
 // ── 초기화 ────────────────────────────────────────────────
 window.addEventListener('resize', onResize);
 onResize();
