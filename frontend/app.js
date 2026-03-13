@@ -364,6 +364,34 @@ renderer.domElement.addEventListener('click', (e) => {
   }
 });
 
+// ── 모바일 터치 지원 ─────────────────────────────────────────
+renderer.domElement.addEventListener('touchend', (e) => {
+  if (!state.joined || e.changedTouches.length !== 1) return;
+  const touch = e.changedTouches[0];
+  const rect = renderer.domElement.getBoundingClientRect();
+  const tx = ((touch.clientX - rect.left) / rect.width) * 2 - 1;
+  const ty = -((touch.clientY - rect.top) / rect.height) * 2 + 1;
+  mouse.set(tx, ty);
+  raycaster.setFromCamera(mouse, camera);
+
+  // 방 터치 → 정보 패널
+  const roomHits = raycaster.intersectObjects(roomMeshes);
+  if (roomHits.length > 0) {
+    showRoomInfo(roomHits[0].object.userData.room);
+    return;
+  }
+
+  // 위치 설정 모드에서 바닥 터치 → 핀 이동
+  if (state.pickingMode) {
+    const floorHit = raycaster.intersectObject(floor);
+    if (floorHit.length > 0) {
+      const { x: fx, z: fz } = floorHit[0].point;
+      socket.emit('set-location', { x: fx, z: fz });
+      exitPickMode();
+    }
+  }
+}, { passive: true });
+
 // ── 키보드 이벤트 ─────────────────────────────────────────────
 window.addEventListener('keydown', e => {
   const tag = document.activeElement?.tagName;

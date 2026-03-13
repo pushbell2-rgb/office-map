@@ -422,3 +422,16 @@ body { font-family: -apple-system, 'Noto Sans KR', sans-serif; background: var(-
 
 /* ── 유저 목록 이모지 ───────────────────────────────────────── */
 .u-emoji-icon { font-size: 14px; flex-shrink: 0; }
+
+/* ── 모바일 반응형 ──────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .app-layout { flex-direction: column; }
+  .left-sidebar { display: none; }
+  .right-sidebar { width: 100%; height: 160px; flex-direction: row; flex-wrap: wrap; overflow-y: auto; }
+  .canvas-wrap { flex: 1; min-height: 0; }
+  .top-bar { font-size: 12px; gap: 4px; padding: 6px 8px; }
+  .btn-topbar, .btn-locate { font-size: 11px; padding: 5px 8px; }
+  .hint-bar { font-size: 11px; gap: 8px; padding: 5px 12px; }
+  .room-info-panel { width: calc(100% - 24px); right: 12px; }
+  .onboard-card { width: 90vw; padding: 28px 20px; }
+}
