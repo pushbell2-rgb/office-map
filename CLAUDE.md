@@ -84,12 +84,17 @@ map-data.js 좌표 의미:
 
 | 방향 | 이벤트 | 페이로드 | 설명 |
 |------|--------|---------|------|
-| 클라 → 서버 | `join` | `{ name: string }` | 세션 참여, 이름 등록 |
+| 클라 → 서버 | `join` | `{ name: string, emoji: string }` | 세션 참여, 이름·이모지 등록 |
 | 클라 → 서버 | `set-location` | `{ x: number, z: number }` | 3D 좌표로 위치 업데이트 |
+| 클라 → 서버 | `update-profile` | `{ name?: string, emoji?: string }` | 이름·이모지 변경 |
+| 클라 → 서버 | `chat` | `{ message: string }` | 채팅 메시지 전송 (서버에서 20자 슬라이싱) |
 | 서버 → 클라 | `joined` | `{ color: string }` | 내 색상 할당 확인 |
 | 서버 → 클라 | `users-update` | `User[]` | 전체 사용자 상태 동기화 |
+| 서버 → 클라 | `chat-message` | `{ id: string, message: string, color: string }` | 브로드캐스트된 채팅 메시지 |
 
-`User` 타입: `{ id: string, name: string, x: number|null, z: number|null, color: string }`
+`User` 타입: `{ id: string, name: string, emoji: string, x: number|null, z: number|null, color: string }`
+
+> **채팅 말풍선 규칙**: 최대 20자, 5초 후 자동 삭제. 연속 입력 시 이전 타이머 취소 후 최신 메시지만 유지.
 
 ---
 
@@ -141,7 +146,32 @@ npm run dev   # node --watch backend/server.js (자동 재시작)
 
 ## 알려진 이슈 / 주의사항
 
-- 핀 펄싱: `pin.children[1]`이 ball을 가정. 핀 구조 변경 시 인덱스 재확인 필요
-- OrbitControls `maxPolarAngle = Math.PI/2 - 0.02`: 바닥 아래 카메라 이동 방지
-- 서버 재시작 시 모든 위치 초기화 → 이는 버그가 아닌 의도된 동작
-- 방 좌표는 도면 이미지 픽셀을 직접 측정해 계산. 오차 발생 시 `map-data.js`에서 개별 조정
+### 렌더링
+
+- **핀 구조 인덱스**: `pin.children[PIN_BALL_INDEX]` (= `children[1]`)이 ball을 가정. 핀 구조 변경 시 `PIN_BALL_INDEX` 상수 재확인 필요
+- **OrbitControls 각도 제한**: `maxPolarAngle = Math.PI/2 - 0.02` — 바닥 아래 카메라 이동 방지. 이보다 낮게 내리면 바닥이 보이지 않는 버그 발생
+- **CSS2DRenderer 레이어**: `pointer-events: none` 설정 필수. 제거 시 마우스 클릭이 캔버스에 도달하지 않음
+- **Fog 설정**: `FogExp2(0x0f172a, 0.008)` — 밀도 0.01 이상 시 먼 거리 방 라벨 시인성 저하
+
+### 소켓 / 상태
+
+- **서버 재시작 시 모든 위치 초기화**: In-memory `Map` 설계 의도. Redis 도입 전까지 영속성 없음
+- **색상 순환 충돌**: `PIN_COLORS` 8가지 순환 — 9번째 사용자부터 색상 중복 발생 (의도된 MVP 설계)
+- **`socket.id` 변경 조건**: 네트워크 재연결 시 `socket.id` 변경 → 기존 핀 제거되고 새 핀 생성됨
+
+### 좌표 시스템
+
+- **방 좌표 오차**: 도면 이미지 픽셀 직접 측정으로 ±0.5 unit 오차 가능. 오차 발생 시 `map-data.js`에서 `x`, `z`, `w`, `d` 개별 조정
+- **바닥 비율**: `FLOOR = { W:140, D:88 }` — 도면 원본 비율 유지. 임의 변경 시 모든 방 좌표 일괄 재계산 필요
+- **방 클릭 Raycaster**: `roomMeshes` 배열 순서로 hit 탐지. 방이 겹칠 경우 앞쪽 방만 선택됨
+
+### 채팅 / 말풍선
+
+- **말풍선 animation 재시작**: CSS animation 재실행을 위해 `element.offsetHeight` reflow 강제 필요. 이 없으면 2번째 메시지부터 애니메이션 없음
+- **핀 생성 전 메시지 수신**: 위치가 설정되지 않은 사용자의 채팅은 핀 없음 → `showChatBubble`이 300ms 후 재시도 1회
+
+### 배포
+
+- **Render 무료 티어 Cold Start**: 비활성 후 첫 요청에 30~60초 지연 발생. 사용자에게 로딩 시간 안내 권장
+- **`process.env.PORT`**: 배포 플랫폼이 PORT 환경변수 주입. 로컬은 3001 기본값 사용
+- **CORS**: 현재 설정 없음 (동일 서버에서 프론트/백 모두 서빙). CDN 분리 배포 시 CORS 설정 필요
