@@ -104,10 +104,22 @@ office-map/
 
 ---
 
+## 배포 (Railway)
+
+1. [railway.app](https://railway.app) 접속 → **New Project → Deploy from GitHub repo**
+2. 이 레포지토리(`office-map`) 선택
+3. 환경변수 설정 불필요 — Railway가 `PORT`를 자동 주입
+4. 배포 완료 후 **Generate Domain** 클릭 → 공개 URL 확보
+
+```
+배포 명령: npm start  (railway.json에 정의됨)
+예상 URL:  https://office-map-xxxx.up.railway.app
+```
+
 ## 환경 변수
 
 | 변수 | 기본값 | 설명 |
 |------|--------|------|
-| `PORT` | `3001` | 서버 포트 (배포 시 자동 설정) |
+| `PORT` | `3001` | 서버 포트 (Railway가 자동 주입) |
 
-별도 `.env` 파일 불필요. 배포 플랫폼(Railway 등)에서 PORT를 자동으로 주입한다.
+별도 `.env` 파일 불필요.
