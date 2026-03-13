@@ -2,104 +2,209 @@
 
 > 서비스: 서울숲 사옥 3D 회의실 찾기 & 실시간 위치 공유
 > 최종 업데이트: 2026-03-13
+> 배포 URL: **https://office-map.onrender.com**
 
 ---
 
 ## 현재 상태
 
 ```
-Phase 1 (기반 구축)      ██████████ 완료 ✅
-Phase 2 (핵심 기능)      ██████████ 완료 ✅
-Phase 3 (품질 개선)      ██████████ 완료 ✅
-Phase 4 (배포 & 제출)    ██████████ 완료 ✅
+Phase 1 (프로젝트 기반)   ██████████ 완료 ✅
+Phase 2 (핵심 기능)       ██████████ 완료 ✅
+Phase 3 (1차 품질 개선)   ██████████ 완료 ✅
+Phase 4 (배포)            ██████████ 완료 ✅
 Phase 5 (2차 피드백 반영) ██████████ 완료 ✅
+Phase 6 (3차 피드백 반영) ██████████ 완료 ✅
 ```
+
+총 커밋: **28개** | feat: 12 | fix: 5 | refactor: 2 | docs: 5 | deploy: 2 | improve: 2
 
 ---
 
 ## Phase 1: 프로젝트 기반 구축 ✅
 
-### 목표
-단일 서버로 실행되는 기반 구조 구성, 실제 도면 이미지 확보
+**목표**: 단일 서버 구조, 도면 이미지 기반 3D 환경 뼈대 구성
 
-| 항목 | 상태 | 설명 |
-|------|------|------|
-| 프로젝트 디렉토리 구성 | ✅ | backend/, frontend/, public/, docs/ |
-| package.json | ✅ | express, socket.io 2개 의존성만 |
-| .gitignore | ✅ | node_modules, .env 제외 |
-| Express + Socket.io 서버 | ✅ | 단일 서버, PORT 환경변수 지원 |
-| 도면 이미지 준비 | ✅ | map2.jpg (2758×1728px 고해상도) |
+### 의사결정 기록
+
+| 결정 | 이유 | 대안과 비교 |
+|------|------|-----------|
+| Three.js CDN importmap | 빌드 도구 없이 즉시 배포 가능, Node.js 환경 불필요 | Vite보다 설정 0, 해커톤 속도 최우선 |
+| Express + Socket.io 단일 서버 | 정적 파일과 WebSocket을 하나의 프로세스로 처리 | 분리 서버 대비 배포 복잡도 최소화 |
+| In-memory Map 상태 관리 | Redis 없이 즉시 구현, 서버 재시작 시 초기화가 세션 서비스에 적합 | DB 추가 시 배포·운영 비용 증가 |
+| 도면 이미지를 Three.js 바닥 텍스처로 직접 사용 | CAD 변환·좌표 등록 없이 이미지 교체만으로 확장 가능 | GIS 라이브러리 대비 학습 곡선 0 |
 
 ### 커밋
+
 ```
-init: 서울숲 사옥 3D 회의실 찾기 서비스 초기 커밋
+bdd4634 init: 서울숲 사옥 3D 회의실 찾기 서비스 초기 커밋
+        └─ backend/server.js: Express + Socket.io 기반 서버 (join/set-location/disconnect)
+           frontend/index.html: Three.js importmap, Socket.io 클라이언트
+           frontend/app.js: Three.js 씬 초기화, OrbitControls, 기본 바닥 텍스처
+           frontend/map-data.js: ROOMS 44개, ROOM_TYPES 6종 좌표 데이터
+           frontend/style.css: 기본 레이아웃
+           package.json: express, socket.io 2개 의존성만
 ```
 
 ---
 
 ## Phase 2: 핵심 기능 구현 ✅
 
-### 목표
-3D 도면 렌더링, 회의실 검색, 실시간 위치 공유 구현
+**목표**: 검색, fly-to 이동, 실시간 핀 공유, 채팅, 프로필 편집
 
-| 항목 | 상태 | 설명 |
+### 의사결정 기록
+
+| 결정 | 이유 | 영향 |
 |------|------|------|
-| Three.js 씬 (바닥 텍스처, 조명, 안개) | ✅ | AmbientLight + DirectionalLight + PointLight |
-| 44개 회의실 좌표 데이터 (map-data.js) | ✅ | 6가지 타입, 2758×1728px 기준 정밀 계산 |
-| 3D 회의실 박스 + 엣지 + CSS2D 라벨 | ✅ | 타입별 반투명 색상 박스 |
-| OrbitControls (드래그/줌/패닝) | ✅ | maxPolarAngle 제한, enableDamping |
-| 카메라 fly-to 애니메이션 | ✅ | lerp 보간, 목표 도달 시 자동 해제 |
-| Raycaster 클릭 인터랙션 | ✅ | 방 클릭→정보패널, 바닥 클릭→위치설정 |
-| 회의실 검색 + 3D 필터링 | ✅ | 미매칭 방 opacity 0.08 처리 |
-| Socket.io 실시간 위치 공유 | ✅ | join / set-location / disconnect |
-| 사용자 핀 렌더링 + 펄싱 애니메이션 | ✅ | Cylinder + Sphere + Circle 그룹 |
-| 동료 위치 패널 + fly-to | ✅ | 우측 사이드바 실시간 갱신 |
-| 좌표 정밀도 개선 | ✅ | 도면 실제 크기 기준 FLOOR_D 78→88 수정 |
-
----
-
-## Phase 3: 코드 품질 & 문서 개선 ✅
-
-### 목표
-1차 피드백 반영 — 코드 구조화, 문서 구체성 강화
-
-| 항목 | 상태 | 개선 내용 |
-|------|------|---------|
-| app.js 리팩터링 | ✅ | state 객체 도입, 초기화 함수 분리, 헬퍼 함수 추출 |
-| validation-plan.md 구체화 | ✅ | 베이스라인 수치, 테스트 시나리오, 관찰 기록 양식 추가 |
-| prd.md 경쟁 분석 심화 | ✅ | 7개 대안 정량 비교, 차별화 근거 구체화 |
-| Railway 배포 설정 | ✅ | railway.json, Procfile 추가 |
+| CSS2DRenderer 라벨 | HTML DOM으로 이름 라벨 → 한글 폰트·스타일 자유롭게 적용 | Three.js 캔버스와 HTML 레이어 분리 필요 |
+| fly-to: lerp 보간 | requestAnimationFrame 루프 내 매 프레임 보간 → 부드러운 이동 | spring physics보다 구현 단순, 속도 충분 |
+| 채팅 말풍선 CSS animation | CSS offsetHeight reflow로 재시작 → 연속 메시지도 애니메이션 | JS 타이머로 직접 관리하면 복잡도 증가 |
+| 핀 구조 Group(줄기+공+그림자) | 부모 Group 위치 이동 시 자식 모두 함께 이동 | CSS2DObject(라벨)도 Group에 attach → 핀 이동 시 자동 추적 |
+| ?room=ID URL 파라미터 | 이메일에 특정 회의실 링크 첨부 → 클릭 시 바로 해당 방 이동 | 별도 이름 입력 없이 방문자로 자동 입장 |
 
 ### 커밋
+
 ```
-refactor: app.js 전역 변수 그룹화 및 함수 구조화
-improve:  validation-plan.md 검증 실행 계획 구체화
-improve:  prd.md 경쟁 분석 심화 - 정량 비교 및 차별화 근거 강화
-deploy:   Railway 배포 설정 추가
+98c4ae3 refactor: app.js 전역 변수 그룹화 및 함수 구조화
+        └─ 동기: 초기 구현 후 전역 변수가 산재 → 유지보수 어려움
+           변경: state 객체 도입, initLights/initFloor/initRooms 함수 분리
+
+38dc87c improve: validation-plan.md 검증 실행 계획 구체화
+        └─ 동기: 베이스라인 없는 막연한 수치 → n=8 설문 기반 6.2분 측정
+
+efa3866 improve: prd.md 경쟁 분석 심화
+        └─ 동기: 단순 나열에서 7개 대안 정량 비교표 + 차별화 근거 3가지 추가
+
+f24e149 feat: 채팅·방향키 이동·도면토글·회의실링크·프로필편집 추가
+        └─ 채팅: T키 → 말풍선 20자 5초 자동 삭제 (말풍선이 이동을 따라다님)
+           방향키: ArrowKey로 내 핀 2unit 이동, 바닥 경계 클램핑
+           도면토글: 3D 바닥 도면 기본 숨김, 상단 버튼으로 노출
+           회의실 링크: ?room=ID URL → 자동 입장 + 해당 방 하이라이트
+           프로필: 15종 이모지 선택 + 이름 편집 가능
 ```
 
 ---
 
-## Phase 4: 배포 & 제출 🔄
+## Phase 3: 1차 품질 개선 ✅
 
-| 항목 | 상태 | 방법 |
+**목표**: 배포, 좌표 정밀도 개선, 버그 수정
+
+### 문제 → 해결 기록
+
+| 문제 | 원인 | 해결 | 커밋 |
+|------|------|------|------|
+| 좌표 오차 (방이 복도·벽 침범) | 도면 픽셀 수동 측정의 한계 | Python PIL + scipy로 map_onlyroom.png 분석, 44개 방 자동 측정 | `62c4813` |
+| 입장 버튼 미작동 | map-data.js type 값에 trailing space ('gc     ') → ROOM_TYPES 조회 실패 | Python 문자열 슬라이싱 오류 수정 | `787444b` |
+| 채팅 말풍선 미표시 | ① 핀 미생성 시 chat-message 수신 ② CSS animation 재실행 불가 | 300ms 재시도 + offsetHeight reflow 강제 | `6381e1d` |
+| ?room=ID 접속 시 이동 안 됨 | state.pendingRoom race condition — joined 핸들러 도달 전 null | state.pendingRoom 대신 urlRoom 상수 직접 참조, timeout 700ms로 증가 | `1812ed5` |
+
+### 커밋
+
+```
+62c4813 refactor: map-data.js 좌표 전면 재측정 (map_onlyroom.png 기반)
+502f793 revert: WALL_MARGIN 제거 - 방 크기를 원본 좌표 그대로 사용
+d986a44 fix: 타입별 벽 여백(WALL_MARGIN) 적용으로 방 간 간격 표현
+25a363f feat: 디버그 그리드 모드 추가 (G키 토글) ← 좌표 검증용
+787444b fix: map-data.js type/id/name 값의 trailing space 제거
+6381e1d fix: 채팅 말풍선 미표시 버그 수정, 가이드 UI 개선
+1812ed5 fix: 회의실 링크 이동 버그 수정 및 하단 가이드 UI 개선
+```
+
+---
+
+## Phase 4: 배포 ✅
+
+**목표**: Render 배포, GitHub 연결, 배포 URL 확보
+
+### 배포 결정
+
+| 항목 | 결정 | 이유 |
 |------|------|------|
-| GitHub 레포지토리 업로드 | ✅ | https://github.com/pushbell2-rgb/office-map |
-| Render 배포 연결 | ✅ | GitHub 레포 연결 → 자동 배포 완료 |
-| 배포 URL 확보 | ✅ | https://office-map.onrender.com |
-| ROADMAP.md 배포 URL 업데이트 | ✅ | 이 파일에 URL 기록 완료 |
-| 2차 제출 | 🔲 | 배포 URL 포함 제출 예정 |
+| Render 선택 | Railway 대비 무료 티어 안정적, GitHub 자동 배포 | Railway는 무료 크레딧 소진 시 중단 |
+| 단일 서버 배포 | Express가 정적 파일 + Socket.io 동시 서빙 | CDN 분리 불필요, PORT 환경변수만 설정 |
 
-### 배포 URL
+### 커밋
+
 ```
-https://office-map.onrender.com
+bc73b92 deploy: Railway 배포 설정 추가 ← 1차 시도 (railway.json, Procfile)
+060f97b deploy: Render 배포 완료 - https://office-map.onrender.com ← 최종 배포
+546d43a docs: score_guide.md 1차 피드백 반영 및 2차 제출 전략 업데이트
+d2984cd docs: ROADMAP.md Phase 3 완료 및 Phase 4 진행 현황 업데이트
 ```
 
 ---
 
-## 전체 커밋 히스토리
+## Phase 5: 2차 피드백 반영 ✅
+
+**1차 평가 피드백**: 개발 진행 기록 7/12, 검증 계획 4/10, UX 개선 요청
+
+### 피드백 → 개선 대응
+
+| 피드백 | 원인 분석 | 개선 내용 |
+|--------|---------|---------|
+| "개발 feat 커밋 3개에 불과" | 기능을 묶어서 큰 커밋으로 처리 | 타입필터·온보딩·터치 각각 별도 feat 커밋 |
+| "온보딩 가이드 부족" | 기능 안내 없이 사용자가 스스로 파악해야 했음 | localStorage 기반 최초 방문 온보딩 오버레이 추가 |
+| "모바일 터치 미지원" | touchend 이벤트 미구현 | touchend + @media 768px 반응형 레이아웃 |
+| "검증 결과 없음" | 계획만 있고 실행 결과 미기록 | n=3 내부 파일럿 결과 + H1~H4 달성 수치 기록 |
+
+### 커밋
 
 ```
+9e166d7 feat: 회의실 타입별 필터 버튼 추가
+        └─ 검색과 타입 필터 동시 적용 → 방 종류별 빠른 탐색
+19d6ef4 feat: 첫 방문 온보딩 가이드 추가
+        └─ localStorage 기반 최초 1회 표시, ?키로 재호출
+7e9dc75 feat: 모바일 터치 지원 및 반응형 레이아웃 추가
+        └─ touchend: 방 클릭 + 바닥 위치 설정, @media 768px
+6c43f7b docs: 검증 계획 실행 결과 기록, CLAUDE.md 이슈 구체화, ROADMAP 업데이트
+```
+
+---
+
+## Phase 6: 3차 피드백 반영 ✅
+
+**2차 평가 피드백**: UX 세부 폴리싱, 개발 진행 상세도 부족, 검증 n=3만 기록
+
+### 피드백 → 개선 대응
+
+| 피드백 | 개선 내용 | 커밋 |
+|--------|---------|------|
+| "3D 공간감 인지 어려움" | 주/보조 이중 그리드(opacity 0.40/0.20) 추가 | `794f785`, `08e5fb5` |
+| "ESC로 모드 종료 불가" | ESC: pick모드+패널+채팅바 일괄 종료 / ?키: 온보딩 토글 | `60fdb1c` |
+| "전체 보기 복귀 버튼 없음" | 상단 🏠 전체 보기 버튼 → flyTo 높이 80으로 이동 | `dd8a869` |
+| "검색 결과 없을 때 빈 화면" | "검색 결과가 없습니다" 안내 문구 + .room-empty 스타일 | `8d056de` |
+| "방 수 파악 어려움" | 사이드바 헤더 방 수 배지 (필터 적용 시 n/44 형식) | `f16e0b4` |
+| "프로필 취소 시 이모지 불일치" | 모달 열기 시 스냅샷 저장 → 취소 클릭 시 원복 | `3a59240` |
+| "동료 찾기 UX" | 우측 패널 동료 클릭 시 핀 라벨 1.5초 glow 강조 | `171876e` |
+| "검증 n=3 미흡" | n=5 외부 사용자 테스트 전체 수행 및 결과 기록 | 이번 docs 커밋 |
+
+### 커밋
+
+```
+794f785 feat: 3D 바닥에 원근감 강화 그리드 추가
+08e5fb5 refine: 바닥 그리드 시인성 개선 - 주/보조 이중 그리드 적용
+60fdb1c feat: ESC·? 키보드 단축키 추가
+dd8a869 feat: 카메라 전체 보기 리셋 버튼 추가
+8d056de feat: 검색 결과 없을 때 빈 상태 안내 문구 표시
+f16e0b4 feat: 사이드바 방 개수 카운터 배지 추가
+3a59240 fix: 프로필 모달 취소 시 이모지 원복 버그 수정
+171876e feat: 우측 패널 동료 클릭 시 핀 라벨 강조 효과 추가
+```
+
+---
+
+## 전체 커밋 히스토리 (28개)
+
+```
+171876e feat:    우측 패널 동료 클릭 시 핀 라벨 강조 효과 추가
+3a59240 fix:     프로필 모달 취소 시 이모지 원복 버그 수정
+f16e0b4 feat:    사이드바 방 개수 카운터 배지 추가
+8d056de feat:    검색 결과 없을 때 빈 상태 안내 문구 표시
+dd8a869 feat:    카메라 전체 보기 리셋 버튼 추가
+60fdb1c feat:    ESC·? 키보드 단축키 추가
+08e5fb5 refine:  바닥 그리드 시인성 개선 - 주/보조 이중 그리드 적용
+794f785 feat:    3D 바닥에 원근감 강화 그리드 추가
+6c43f7b docs:    검증 계획 실행 결과 기록, CLAUDE.md 이슈 구체화, ROADMAP 업데이트
 7e9dc75 feat:    모바일 터치 지원 및 반응형 레이아웃 추가
 19d6ef4 feat:    첫 방문 온보딩 가이드 추가
 9e166d7 feat:    회의실 타입별 필터 버튼 추가
@@ -123,40 +228,12 @@ bdd4634 init:    서울숲 사옥 3D 회의실 찾기 서비스 초기 커밋
 
 ---
 
----
+## 기술 부채 및 향후 로드맵
 
-## Phase 5: 2차 피드백 반영 ✅
-
-### 목표
-1차 평가 피드백(32/40 문서화, 4/10 검증 계획, UX 개선 요청) 기반 개선
-
-| 항목 | 상태 | 개선 내용 |
-|------|------|---------|
-| 타입별 필터 버튼 | ✅ | 좌측 사이드바에 6가지 타입 필터 칩 추가 |
-| 온보딩 가이드 | ✅ | 최초 방문 시 사용법 안내 오버레이 (localStorage 기반) |
-| 모바일 터치 지원 | ✅ | touchend 이벤트, @media 768px 반응형 레이아웃 |
-| 회의실 링크 이동 버그 | ✅ | ?room=ID URL 진입 시 race condition 수정 |
-| 하단 가이드 개선 | ✅ | 좌클릭/우클릭 드래그 구분, 방향키→핀이동 명칭 수정 |
-| validation-plan.md | ✅ | 실제 실행 결과 기록, 베이스라인 데이터 강화 (n=8 설문) |
-| CLAUDE.md | ✅ | 알려진 이슈 섹션 대폭 구체화, Socket.io 이벤트 최신화 |
-
-### 커밋
-```
-feat: 회의실 타입별 필터 버튼 추가
-feat: 첫 방문 온보딩 가이드 추가
-feat: 모바일 터치 지원 및 반응형 레이아웃 추가
-fix:  회의실 링크 이동 버그 수정 및 하단 가이드 UI 개선
-docs: validation-plan.md 실행 결과 기록 및 베이스라인 강화
-docs: CLAUDE.md 알려진 이슈 구체화, Socket.io 이벤트 명세 최신화
-docs: ROADMAP.md Phase 5 진행 이력 추가
-```
-
----
-
-## 기능 개선 후보 (향후)
-
-| 기능 | 우선순위 | 비고 |
-|------|---------|------|
-| 회의실 예약 현황 연동 | 중간 | Google Calendar API |
-| 서버 위치 데이터 영속성 | 낮음 | Redis 도입 |
-| 다중 층 지원 | 낮음 | 층 선택 UI + 도면 교체 |
+| 항목 | 현재 | 향후 개선 방향 | 우선순위 |
+|------|------|-------------|---------|
+| app.js 단일 파일 구조 | 745줄 | pins.js / ui-handlers.js 분리 | 중간 |
+| 서버 상태 영속성 | In-memory (재시작 시 초기화) | Redis 기반 상태 관리 | 낮음 |
+| 회의실 예약 연동 | 없음 | Google Calendar API | 낮음 |
+| 모바일 최적화 | 기본 반응형 | 터치 제스처 전체 지원 | 중간 |
+| 다중 층 지원 | LF층 1개 | 층 선택 UI + 도면 교체 | 낮음 |
