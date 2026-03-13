@@ -11,7 +11,7 @@
 Phase 1 (기반 구축)    ██████████ 완료 ✅
 Phase 2 (핵심 기능)    ██████████ 완료 ✅
 Phase 3 (품질 개선)    ██████████ 완료 ✅
-Phase 4 (배포 & 제출)  ████░░░░░░ 진행 중 🔄
+Phase 4 (배포 & 제출)  ████████░░ 배포 완료, 제출 대기 🔄
 ```
 
 ---
@@ -84,14 +84,14 @@ deploy:   Railway 배포 설정 추가
 | 항목 | 상태 | 방법 |
 |------|------|------|
 | GitHub 레포지토리 업로드 | ✅ | https://github.com/pushbell2-rgb/office-map |
-| Railway 배포 연결 | 🔄 | GitHub 레포 연결 → 자동 배포 |
-| 배포 URL 확보 | 🔲 | Generate Domain 클릭 |
-| ROADMAP.md 배포 URL 업데이트 | 🔲 | 이 파일에 URL 기록 |
-| 2차 제출 | 🔲 | 배포 URL 포함 제출 |
+| Render 배포 연결 | ✅ | GitHub 레포 연결 → 자동 배포 완료 |
+| 배포 URL 확보 | ✅ | https://office-map.onrender.com |
+| ROADMAP.md 배포 URL 업데이트 | ✅ | 이 파일에 URL 기록 완료 |
+| 2차 제출 | 🔲 | 배포 URL 포함 제출 예정 |
 
 ### 배포 URL
 ```
-(배포 완료 후 기록)
+https://office-map.onrender.com
 ```
 
 ---

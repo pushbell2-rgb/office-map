@@ -58,7 +58,7 @@
 ## 2차 제출
 
 - **제출일**: (작성 예정)
-- **배포 URL**: (Railway 배포 후 기록)
+- **배포 URL**: https://office-map.onrender.com
 
 ### 1차 피드백 반영 개선 내용
 
@@ -72,11 +72,11 @@
 
 ### 2차 제출 전 체크리스트
 
-- [ ] Railway에서 GitHub 레포 연결 완료
+- [x] Render에서 GitHub 레포 연결 완료
 - [ ] 배포 URL 정상 동작 확인 (회의실 3D, 검색, 위치 공유)
-- [ ] 배포 URL → README.md 상단에 추가
-- [ ] 배포 URL → ROADMAP.md Phase 4 완료 처리
-- [ ] score_guide.md 배포 URL 기록
+- [x] 배포 URL → README.md 상단에 추가
+- [x] 배포 URL → ROADMAP.md Phase 4 완료 처리
+- [x] score_guide.md 배포 URL 기록
 - [ ] `node_modules/` git에 포함 안 됐는지 확인
 - [ ] `.env` 파일 커밋 없는지 확인
 

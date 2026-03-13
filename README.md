@@ -1,5 +1,7 @@
 # 서울숲 사옥 3D 회의실 찾기
 
+**🚀 배포 URL: https://office-map.onrender.com**
+
 **실제 도면 기반 3D 지도로 회의실 위치를 파악하고, 실시간으로 동료 위치를 공유하는 사내 웹 서비스**
 
 ---
@@ -104,17 +106,13 @@ office-map/
 
 ---
 
-## 배포 (Railway)
+## 배포
 
-1. [railway.app](https://railway.app) 접속 → **New Project → Deploy from GitHub repo**
-2. 이 레포지토리(`office-map`) 선택
-3. 환경변수 설정 불필요 — Railway가 `PORT`를 자동 주입
-4. 배포 완료 후 **Generate Domain** 클릭 → 공개 URL 확보
+**현재 배포 URL: https://office-map.onrender.com** (Render)
 
-```
-배포 명령: npm start  (railway.json에 정의됨)
-예상 URL:  https://office-map-xxxx.up.railway.app
-```
+로컬 실행이 필요한 경우 아래 방법으로 직접 배포 가능:
+- Render: New Web Service → GitHub 연결 → Build: `npm install` / Start: `npm start`
+- Railway: railway.json 설정 포함되어 있어 GitHub 연결만으로 자동 배포
 
 ## 환경 변수
 
