@@ -655,12 +655,14 @@ window.flyToUser = (x, z, userId) => {
 };
 
 // ── 범례 ─────────────────────────────────────────────────────
-document.getElementById('legend').innerHTML = Object.entries(ROOM_TYPES).map(([, v]) => `
-  <div class="legend-item">
+document.getElementById('legend').innerHTML = Object.entries(ROOM_TYPES).map(([type, v]) => {
+  const cnt = ROOMS.filter(r => r.type === type).length;
+  return `<div class="legend-item">
     <span class="legend-dot" style="background:${v.color}"></span>
     <span>${v.label}</span>
-  </div>
-`).join('');
+    <span class="legend-count">${cnt}</span>
+  </div>`;
+}).join('');
 
 // ── 프로필 편집 ───────────────────────────────────────────────
 function updateProfileBtn() {
