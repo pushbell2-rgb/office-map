@@ -7,6 +7,17 @@ import { ROOMS, ROOM_TYPES } from './map-data.js';
 const FLOOR = { W: 140, D: 88, CX: 70, CZ: 44 };
 const PIN_BALL_INDEX = 1; // Group children 내 ball 위치
 
+// 벽 여백: 각 방의 실제 렌더 크기를 원본 좌표보다 줄여 방들 사이 벽 간격 표현
+// 타입별로 다른 여백 적용 (단위: 3D units, 한 면당)
+const WALL_MARGIN = {
+  gc:      0.35,  // GC 공용 회의실 — 작은 방들이 밀집, 벽 강조
+  ubicare: 0.35,  // 유비케어 회의실 — 동일
+  lounge:  0.25,  // 라운지 — 개방감 있게 여백 작게
+  project: 0.35,  // 프로젝트룸
+  studio:  0.3,   // 서버실/창고
+  edit:    0.35,  // 임원실/본부장
+};
+
 // ── 상태 (인터랙션·소켓) ──────────────────────────────────
 const state = {
   pickingMode: false,
@@ -87,10 +98,15 @@ function initRooms() {
   ROOMS.forEach(room => {
     const typeInfo = ROOM_TYPES[room.type];
     const ROOM_H = room.type === 'lounge' ? 1.5 : 2.5;
+    const margin = WALL_MARGIN[room.type] ?? 0.3;
+
+    // 벽 여백 적용: 방 중심은 유지하고 크기만 줄임
+    const rw = Math.max(room.w - margin * 2, 0.5);
+    const rd = Math.max(room.d - margin * 2, 0.5);
     const cx = room.x + room.w / 2;
     const cz = room.z + room.d / 2;
 
-    const geo = new THREE.BoxGeometry(room.w, ROOM_H, room.d);
+    const geo = new THREE.BoxGeometry(rw, ROOM_H, rd);
     const mat = new THREE.MeshStandardMaterial({
       color: typeInfo.hex,
       transparent: true,
