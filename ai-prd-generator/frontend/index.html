@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI PRD Generator — 아이디어를 PRD로</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="header">
+    <div class="container">
+      <div class="header-inner">
+        <div class="logo">
+          <span class="logo-icon">📄</span>
+          <span class="logo-text">AI PRD Generator</span>
+        </div>
+        <p class="header-tagline">아이디어 한 줄 → 구조화된 PRD 30초 완성</p>
+      </div>
+    </div>
+  </header>
+
+  <main class="main">
+    <div class="container">
+      <div class="layout">
+
+        <!-- 입력 패널 -->
+        <section class="panel panel-input">
+          <h2 class="panel-title">아이디어 입력</h2>
+
+          <form id="prdForm" novalidate>
+            <div class="form-group">
+              <label for="idea" class="form-label">
+                서비스 아이디어 <span class="required">*</span>
+              </label>
+              <textarea
+                id="idea"
+                name="idea"
+                class="form-textarea"
+                placeholder="예: 배달 앱 사용자를 위한 AI 메뉴 추천 서비스. 과거 주문 패턴과 날씨, 시간대를 분석해 최적의 메뉴를 추천한다."
+                maxlength="500"
+                rows="5"
+                required
+              ></textarea>
+              <div class="form-meta">
+                <span id="ideaError" class="form-error" hidden>아이디어를 입력해주세요.</span>
+                <span class="char-count"><span id="ideaCount">0</span> / 500</span>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="targetUser" class="form-label">타겟 사용자 <span class="optional">(선택)</span></label>
+              <input
+                type="text"
+                id="targetUser"
+                name="targetUser"
+                class="form-input"
+                placeholder="예: 20~30대 직장인, 요리를 즐기는 주부"
+                maxlength="200"
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="category" class="form-label">산업군 / 카테고리 <span class="optional">(선택)</span></label>
+              <input
+                type="text"
+                id="category"
+                name="category"
+                class="form-input"
+                placeholder="예: Food Tech, EdTech, B2B SaaS, HealthTech"
+                maxlength="200"
+              />
+            </div>
+
+            <button type="submit" id="submitBtn" class="btn btn-primary btn-full">
+              <span class="btn-text">PRD 생성하기</span>
+              <span class="btn-loader" hidden>
+                <span class="spinner"></span> AI가 생성 중...
+              </span>
+            </button>
+          </form>
+        </section>
+
+        <!-- 결과 패널 -->
+        <section class="panel panel-result">
+          <div class="result-header">
+            <h2 class="panel-title">생성된 PRD</h2>
+            <button id="downloadBtn" class="btn btn-secondary" disabled>
+              Markdown 다운로드
+            </button>
+          </div>
+
+          <!-- 초기 상태 -->
+          <div id="resultEmpty" class="result-empty">
+            <div class="empty-icon">📝</div>
+            <p class="empty-title">아직 생성된 PRD가 없어요</p>
+            <p class="empty-desc">왼쪽에 아이디어를 입력하고<br />"PRD 생성하기" 버튼을 눌러보세요.</p>
+          </div>
+
+          <!-- 로딩 상태 -->
+          <div id="resultLoading" class="result-loading" hidden>
+            <div class="loading-spinner"></div>
+            <p class="loading-text">Claude AI가 PRD를 작성 중입니다...</p>
+            <p class="loading-subtext">보통 10~30초 정도 소요됩니다</p>
+          </div>
+
+          <!-- 에러 상태 -->
+          <div id="resultError" class="result-error" hidden>
+            <div class="error-icon">⚠️</div>
+            <p class="error-title">PRD 생성에 실패했습니다</p>
+            <p id="errorMessage" class="error-desc"></p>
+            <button id="retryBtn" class="btn btn-secondary">다시 시도</button>
+          </div>
+
+          <!-- PRD 결과 -->
+          <div id="resultContent" class="result-content" hidden>
+            <div id="prdSections" class="prd-sections"></div>
+          </div>
+        </section>
+
+      </div>
+    </div>
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      <p>Powered by Claude AI &nbsp;·&nbsp; AI PRD Generator</p>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
