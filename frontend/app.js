@@ -585,14 +585,23 @@ function renderRoomList(query = '') {
   };
   const filtered = ROOMS.filter(matchRoom);
 
+  const hl = (text) => {
+    if (!q) return text;
+    const idx = text.toLowerCase().indexOf(q);
+    if (idx === -1) return text;
+    return text.slice(0, idx)
+      + `<mark class="search-hl">${text.slice(idx, idx + q.length)}</mark>`
+      + text.slice(idx + q.length);
+  };
+
   document.getElementById('room-list').innerHTML = filtered.length === 0
     ? `<div class="room-empty">검색 결과가 없습니다</div>`
     : filtered.map(r => {
         const ti = ROOM_TYPES[r.type];
         return `<div class="room-item" onclick="focusRoom('${r.id}')">
           <span class="ri-dot" style="background:${ti.color}"></span>
-          <span class="ri-id-sm">${r.id}</span>
-          <span class="ri-name-sm">${r.name}</span>
+          <span class="ri-id-sm">${hl(r.id)}</span>
+          <span class="ri-name-sm">${hl(r.name)}</span>
           <button class="btn-link-room" onclick="copyRoomLink(event,'${r.id}')" title="링크 복사">🔗</button>
         </div>`;
       }).join('');
