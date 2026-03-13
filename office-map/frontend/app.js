@@ -4,7 +4,8 @@ import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer
 import { ROOMS, ROOM_TYPES } from './map-data.js';
 
 // ── 기본 설정 ──────────────────────────────────────────────
-const FLOOR_W = 100, FLOOR_D = 54;
+// map2.jpg 1400×780px → 3D 140×78 units (÷10)
+const FLOOR_W = 140, FLOOR_D = 78;
 const FLOOR_CX = FLOOR_W / 2, FLOOR_CZ = FLOOR_D / 2;
 
 // ── Scene ──────────────────────────────────────────────────
@@ -38,7 +39,7 @@ function resize() {
 
 // ── Camera ─────────────────────────────────────────────────
 const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 500);
-camera.position.set(FLOOR_CX, 58, FLOOR_D + 42);
+camera.position.set(FLOOR_CX, 75, FLOOR_D + 58);
 camera.lookAt(FLOOR_CX, 0, FLOOR_CZ);
 
 // ── Controls ───────────────────────────────────────────────
@@ -59,10 +60,10 @@ sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
 sun.shadow.camera.near = 0.5;
 sun.shadow.camera.far = 200;
-sun.shadow.camera.left = -80;
-sun.shadow.camera.right = 80;
-sun.shadow.camera.top = 60;
-sun.shadow.camera.bottom = -60;
+sun.shadow.camera.left = -100;
+sun.shadow.camera.right = 100;
+sun.shadow.camera.top = 80;
+sun.shadow.camera.bottom = -80;
 scene.add(sun);
 
 // 보조 포인트 라이트 (depth감)
@@ -70,9 +71,9 @@ const fill = new THREE.PointLight(0x6366f1, 0.8, 80);
 fill.position.set(20, 20, 20);
 scene.add(fill);
 
-// ── 바닥 (map.jpg 텍스처) ────────────────────────────────
+// ── 바닥 (map2.jpg 텍스처 — 고해상도) ───────────────────
 const loader = new THREE.TextureLoader();
-const mapTex = loader.load('/public/map.jpg', tex => {
+const mapTex = loader.load('/public/map2.jpg', tex => {
   tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
   tex.colorSpace = THREE.SRGBColorSpace;
 });
