@@ -665,12 +665,17 @@ renderEmojiGrid('join-emoji-grid');
 renderEmojiGrid('profile-emoji-grid');
 
 document.getElementById('profile-btn').addEventListener('click', () => {
+  state._emojiBeforeEdit = state.myEmoji;   // 취소 시 복원용 스냅샷
+  state._nameBeforeEdit  = state.myName;
   document.getElementById('profile-name-input').value = state.myName;
   renderEmojiGrid('profile-emoji-grid');
   document.getElementById('profile-modal').hidden = false;
 });
 
 document.getElementById('profile-cancel-btn').addEventListener('click', () => {
+  // 모달 안에서 클릭한 이모지 변경사항 원복
+  state.myEmoji = state._emojiBeforeEdit ?? state.myEmoji;
+  state.myName  = state._nameBeforeEdit  ?? state.myName;
   document.getElementById('profile-modal').hidden = true;
 });
 
