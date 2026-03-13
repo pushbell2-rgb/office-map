@@ -270,6 +270,11 @@ body { font-family: -apple-system, 'Noto Sans KR', sans-serif; background: var(-
   white-space: nowrap;
   margin-bottom: 4px;
   transform: translateY(-4px);
+  transition: transform .2s, box-shadow .2s;
+}
+.user-label.label-highlight {
+  transform: translateY(-4px) scale(1.15);
+  box-shadow: 0 0 10px 3px rgba(99,102,241,0.7);
 }
 
 /* 스크롤바 커스텀 */

@@ -625,7 +625,7 @@ function renderUserList(users) {
   const placed = users.filter(u => u.x !== null);
   document.getElementById('user-count').textContent = placed.length;
   document.getElementById('user-list').innerHTML = placed.map(u => `
-    <div class="user-item" onclick="flyToUser(${u.x}, ${u.z})">
+    <div class="user-item" onclick="flyToUser(${u.x}, ${u.z}, '${u.id}')">
       <span class="u-emoji-icon">${u.emoji || '🙂'}</span>
       <span class="u-dot" style="background:${u.color}"></span>
       <span class="u-name">${u.name}</span>
@@ -633,7 +633,17 @@ function renderUserList(users) {
     </div>
   `).join('') || '<div class="u-empty">아직 위치를 설정한 사람이 없어요</div>';
 }
-window.flyToUser = (x, z) => flyTo(x, z, 18);
+window.flyToUser = (x, z, userId) => {
+  flyTo(x, z, 18);
+  // 해당 핀 라벨 잠깐 강조
+  if (userId) {
+    const pin = userPins.get(userId);
+    if (pin?.userData.nameDiv) {
+      pin.userData.nameDiv.classList.add('label-highlight');
+      setTimeout(() => pin.userData.nameDiv.classList.remove('label-highlight'), 1500);
+    }
+  }
+};
 
 // ── 범례 ─────────────────────────────────────────────────────
 document.getElementById('legend').innerHTML = Object.entries(ROOM_TYPES).map(([, v]) => `
