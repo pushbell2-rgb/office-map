@@ -465,6 +465,14 @@ window.addEventListener('keydown', e => {
     const ov = document.getElementById('onboard-overlay');
     ov.hidden = !ov.hidden;
   }
+
+  // /키: 검색창 포커스
+  if (!isTyping && e.key === '/') {
+    e.preventDefault();
+    const input = document.getElementById('search-input');
+    input.focus();
+    input.select();
+  }
 });
 
 // ── 채팅 입력 ─────────────────────────────────────────────────
