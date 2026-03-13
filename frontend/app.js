@@ -175,17 +175,23 @@ const userPins = new Map();
 
 // ── 바닥 그리드 (3D 원근감 강화) ──────────────────────────────
 (function initSceneGrid() {
-  // 큰 칸 그리드 (10unit × 10unit) — 아주 연하게
-  const grid = new THREE.GridHelper(
-    Math.max(FLOOR.W, FLOOR.D) * 1.2, 16,
-    0x6366f1, 0x1e293b
-  );
+  const SIZE = Math.max(FLOOR.W, FLOOR.D) * 1.2;
+  // 주 그리드 (큰 칸)
+  const grid = new THREE.GridHelper(SIZE, 14, 0x6366f1, 0x334155);
   grid.position.set(FLOOR.CX, 0.02, FLOOR.CZ);
-  const mat = grid.material;
-  mat.transparent = true;
-  mat.opacity = 0.18;
-  mat.depthWrite = false;
+  const m1 = grid.material;
+  m1.transparent = true;
+  m1.opacity = 0.40;
+  m1.depthWrite = false;
   scene.add(grid);
+  // 보조 그리드 (세밀한 칸)
+  const grid2 = new THREE.GridHelper(SIZE, 42, 0x334155, 0x334155);
+  grid2.position.set(FLOOR.CX, 0.01, FLOOR.CZ);
+  const m2 = grid2.material;
+  m2.transparent = true;
+  m2.opacity = 0.20;
+  m2.depthWrite = false;
+  scene.add(grid2);
 })();
 
 // ── 유저 핀 동기화 ────────────────────────────────────────────
