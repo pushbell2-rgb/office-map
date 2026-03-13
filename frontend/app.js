@@ -540,6 +540,10 @@ function exitPickMode() {
   btn.classList.remove('active');
   document.getElementById('pick-hint').hidden = true;
 }
+document.getElementById('reset-camera-btn').addEventListener('click', () => {
+  flyTo(FLOOR.CX, FLOOR.CZ, 80);
+});
+
 document.getElementById('locate-btn').addEventListener('click', () => {
   state.pickingMode ? exitPickMode() : enterPickMode();
 });
