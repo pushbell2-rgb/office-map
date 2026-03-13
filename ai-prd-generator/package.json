@@ -1,0 +1,22 @@
+{
+  "name": "ai-prd-generator",
+  "version": "1.0.0",
+  "description": "AI-powered PRD (Product Requirements Document) generator — input one idea, get a structured PRD instantly",
+  "main": "backend/server.js",
+  "scripts": {
+    "start": "node backend/server.js",
+    "dev": "node --watch backend/server.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.36.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.18.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": ["prd", "ai", "product-management", "claude"],
+  "author": "",
+  "license": "MIT"
+}
