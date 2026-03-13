@@ -576,15 +576,17 @@ function renderRoomList(query = '') {
   };
   const filtered = ROOMS.filter(matchRoom);
 
-  document.getElementById('room-list').innerHTML = filtered.map(r => {
-    const ti = ROOM_TYPES[r.type];
-    return `<div class="room-item" onclick="focusRoom('${r.id}')">
-      <span class="ri-dot" style="background:${ti.color}"></span>
-      <span class="ri-id-sm">${r.id}</span>
-      <span class="ri-name-sm">${r.name}</span>
-      <button class="btn-link-room" onclick="copyRoomLink(event,'${r.id}')" title="링크 복사">🔗</button>
-    </div>`;
-  }).join('');
+  document.getElementById('room-list').innerHTML = filtered.length === 0
+    ? `<div class="room-empty">검색 결과가 없습니다</div>`
+    : filtered.map(r => {
+        const ti = ROOM_TYPES[r.type];
+        return `<div class="room-item" onclick="focusRoom('${r.id}')">
+          <span class="ri-dot" style="background:${ti.color}"></span>
+          <span class="ri-id-sm">${r.id}</span>
+          <span class="ri-name-sm">${r.name}</span>
+          <button class="btn-link-room" onclick="copyRoomLink(event,'${r.id}')" title="링크 복사">🔗</button>
+        </div>`;
+      }).join('');
 
   roomMeshes.forEach(m => {
     m.material.opacity = matchRoom(m.userData.room) ? m.userData.originalOpacity : 0.08;
