@@ -7,11 +7,9 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-// 정적 파일 서빙
 app.use(express.static(path.join(__dirname, '../frontend')));
 app.use('/public', express.static(path.join(__dirname, '../public')));
 
-// 인메모리 사용자 상태
 const users = new Map();
 const PIN_COLORS = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
 let colorIdx = 0;
@@ -24,11 +22,16 @@ io.on('connection', (socket) => {
   console.log('[소켓] 연결:', socket.id);
   const color = PIN_COLORS[colorIdx++ % PIN_COLORS.length];
 
-  // 현재 사용자 목록 즉시 전송
   socket.emit('users-update', Array.from(users.values()));
 
-  socket.on('join', ({ name }) => {
-    users.set(socket.id, { id: socket.id, name: name || '익명', x: null, z: null, color });
+  socket.on('join', ({ name, emoji }) => {
+    users.set(socket.id, {
+      id: socket.id,
+      name: name || '익명',
+      emoji: emoji || '🙂',
+      x: null, z: null,
+      color,
+    });
     socket.emit('joined', { color });
     broadcast();
   });
@@ -36,6 +39,27 @@ io.on('connection', (socket) => {
   socket.on('set-location', ({ x, z }) => {
     const user = users.get(socket.id);
     if (user) { user.x = x; user.z = z; broadcast(); }
+  });
+
+  socket.on('update-profile', ({ name, emoji }) => {
+    const user = users.get(socket.id);
+    if (user) {
+      if (name) user.name = name;
+      if (emoji) user.emoji = emoji;
+      broadcast();
+    }
+  });
+
+  // 채팅: 최대 20자 제한, 5초 후 자동 삭제
+  socket.on('chat', ({ message }) => {
+    const user = users.get(socket.id);
+    if (!user || !message) return;
+    const msg = String(message).slice(0, 20);
+    io.emit('chat-message', {
+      id: socket.id,
+      message: msg,
+      color: user.color,
+    });
   });
 
   socket.on('disconnect', () => {
