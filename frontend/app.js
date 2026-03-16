@@ -142,15 +142,47 @@ function initRooms() {
   return meshes;
 }
 
-// 형광 동그라미 마커 div — CSS2DObject용 (원근 무관 항상 동일 크기)
-function makeEntranceMarkerDiv(text, colorStr) {
-  const div = document.createElement('div');
-  div.className = 'entrance-marker';
-  div.textContent = text;
-  div.style.background   = colorStr;
-  div.style.boxShadow    = `0 0 10px ${colorStr}, 0 0 24px ${colorStr}99`;
-  div.style.fontSize     = text.length > 4 ? '8.5px' : '10.5px';
-  return div;
+// 형광 동그라미 마커 — THREE.Sprite용 CanvasTexture (줌에 비례해 자연스럽게 크기 변화)
+function makeCircleLabel(text, fillColor) {
+  const SIZE = 512;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = SIZE;
+  const ctx = canvas.getContext('2d');
+  const cx = SIZE / 2, cy = SIZE / 2, r = SIZE * 0.41;
+
+  // 외부 방사형 글로우
+  const grd = ctx.createRadialGradient(cx, cy, r * 0.5, cx, cy, r * 1.25);
+  grd.addColorStop(0, fillColor + 'bb');
+  grd.addColorStop(1, fillColor + '00');
+  ctx.beginPath();
+  ctx.arc(cx, cy, r * 1.25, 0, Math.PI * 2);
+  ctx.fillStyle = grd;
+  ctx.fill();
+
+  // 메인 원
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fillStyle = fillColor;
+  ctx.globalAlpha = 0.92;
+  ctx.fill();
+  ctx.globalAlpha = 1;
+
+  // 흰색 테두리
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(255,255,255,0.88)';
+  ctx.lineWidth = SIZE * 0.025;
+  ctx.stroke();
+
+  // 텍스트
+  const fontSize = Math.floor(SIZE * (text.length > 4 ? 0.155 : 0.195));
+  ctx.font = `900 ${fontSize}px -apple-system, "Noto Sans KR", Arial, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#060d02';
+  ctx.fillText(text, cx, cy);
+
+  return new THREE.CanvasTexture(canvas);
 }
 
 function initEntrances() {
@@ -184,12 +216,14 @@ function initEntrances() {
     glow.position.y = 0.04;
     g.add(glow);
 
-    // ── CSS2DObject 형광 동그라미 라벨 (항상 동일 화면 크기) ────
-    const labelText  = entry.callout || entry.name;
-    const markerDiv  = makeEntranceMarkerDiv(labelText, colorStr);
-    const markerObj  = new CSS2DObject(markerDiv);
-    markerObj.position.set(0, 0.5, 0); // 바닥 바로 위
-    g.add(markerObj);
+    // ── Sprite 형광 동그라미 라벨 (Three.js 원근에 따라 줌 비례 크기 변화) ──
+    const labelText = entry.callout || entry.name;
+    const sprite = new THREE.Sprite(
+      new THREE.SpriteMaterial({ map: makeCircleLabel(labelText, colorStr), transparent: true, depthWrite: false })
+    );
+    sprite.scale.set(5, 5, 1); // world units — 줌에 비례해 자연스럽게 변화
+    sprite.position.set(0, 2.5, 0);
+    g.add(sprite);
 
     // ── 방향 화살표 (동그라미 테두리에 화살촉 끝이 닿음) ──────
     if (entry.direction) {
