@@ -570,6 +570,10 @@ socket.on('joined', ({ color }) => {
   if (urlRoom) {
     setTimeout(() => highlightRoomById(urlRoom), 700);
   }
+  // 모바일: 내 스폰 위치로 카메라 이동 (줌 유지)
+  if (window.innerWidth <= 768) {
+    setTimeout(() => flyToRoom(sp.x, sp.z), 300);
+  }
 });
 
 socket.on('users-update', syncPins);
@@ -1316,7 +1320,7 @@ function animate() {
   if (compassRingEl) {
     const theta = controls.getAzimuthalAngle();
     if (lastCompassTheta === null || Math.abs(theta - lastCompassTheta) > 0.003) {
-      compassRingEl.style.transform = `rotate(${(-theta * 180 / Math.PI).toFixed(1)}deg)`;
+      compassRingEl.style.transform = `rotate(${(theta * 180 / Math.PI).toFixed(1)}deg)`;
       lastCompassTheta = theta;
     }
   }
