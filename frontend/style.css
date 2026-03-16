@@ -581,13 +581,24 @@ body { font-family: -apple-system, 'Noto Sans KR', sans-serif; background: var(-
   .left-sidebar, .right-sidebar { display: none; }
   #canvas-container { height: 100dvh; }
 
-  /* 상단 바: safe-area 대응 + 단순화 */
+  /* 상단 바: 상태표시줄 완전 대응
+     top:0 + padding-top으로 배경이 노치 뒤까지 채우고 내용물은 아래에 */
   .top-bar {
-    top: calc(env(safe-area-inset-top, 0px) + 8px);
-    padding: 6px 10px; gap: 6px;
+    top: 0;
+    left: 0; right: 0;
+    transform: none;
+    border-radius: 0 0 16px 16px;
+    padding-top: calc(env(safe-area-inset-top, 0px) + 6px);
+    padding-bottom: 8px;
+    padding-left: max(env(safe-area-inset-left, 0px), 10px);
+    padding-right: max(env(safe-area-inset-right, 0px), 10px);
+    gap: 8px;
+    width: 100%;
+    box-sizing: border-box;
+    z-index: 25;
   }
-  .top-title { font-size: 13px; }
-  .btn-topbar { font-size: 11px; padding: 5px 8px; }
+  .top-title { font-size: 13px; flex: 1; }
+  .btn-topbar { font-size: 11px; padding: 5px 8px; flex-shrink: 0; }
   #locate-btn, #profile-btn { display: none; }
 
   /* PC 전용 요소 숨김 */

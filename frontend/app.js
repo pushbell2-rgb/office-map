@@ -621,16 +621,15 @@ function highlightRoomById(roomId) {
   flashRoom(mesh);
 }
 
-// 아주 강렬한 반짝임 — rAF 기반 (6초, 초당 ~8회 점멸, 후반부 서서히 감쇠)
+// 링크 유입 강조 — 느린 색상 맥박 (황금색, 0.5Hz, 8초)
 function flashRoom(mesh) {
-  const origIntensity = mesh.userData.originalEmissive;
-  const origColor     = mesh.material.emissive.clone();
-  const flashColor    = new THREE.Color(0xffffff); // 흰색으로 극대화
-  const DURATION      = 6000;  // ms
-  const FADE_START    = 4000;  // 이후 감쇠
-  const start         = performance.now();
+  const origIntensity  = mesh.userData.originalEmissive;
+  const origColor      = mesh.material.emissive.clone();
+  const highlightColor = new THREE.Color(0xffd700); // 황금색 강조
+  const DURATION   = 8000;
+  const FADE_START = 5500; // 5.5초 이후 서서히 원래 상태로
+  const start = performance.now();
 
-  // 이미 실행 중이면 이전 rAF 취소
   if (mesh.userData.flashCancel) mesh.userData.flashCancel();
   let raf;
 
@@ -643,21 +642,17 @@ function flashRoom(mesh) {
       return;
     }
 
-    // 감쇠 배율 (4초 이후 1→0 선형 감소)
+    // 감쇠 (5.5초 이후 1→0)
     const decay = elapsed < FADE_START
       ? 1.0
       : 1.0 - (elapsed - FADE_START) / (DURATION - FADE_START);
 
-    // 고주파(8Hz) + 저주파(2Hz) 합성으로 불규칙한 느낌
-    const fast = Math.sin(elapsed * 0.050);   // ~8 Hz
-    const slow = Math.sin(elapsed * 0.013);   // ~2 Hz
-    const wave = Math.abs(fast) * 0.7 + Math.abs(slow) * 0.3;
+    // 0.5Hz 느린 사인 맥박 (2초 주기)
+    const wave = 0.5 + 0.5 * Math.sin(elapsed * 0.00314); // π/1000 ≈ 0.5Hz
 
-    const intensity = wave * 2.2 * decay;     // 최대 2.2 (아주 밝음)
-
-    // 점멸 상태에 따라 흰색 ↔ 원래 색 보간
-    mesh.material.emissive.lerpColors(origColor, flashColor, Math.min(1, intensity * 0.5));
-    mesh.material.emissiveIntensity = intensity;
+    // 황금색으로 보간 + 밝기 강조
+    mesh.material.emissive.lerpColors(origColor, highlightColor, wave * decay);
+    mesh.material.emissiveIntensity = (origIntensity + wave * 1.6) * decay + origIntensity * (1 - decay);
 
     raf = requestAnimationFrame(tick);
   }
@@ -1162,7 +1157,24 @@ function initMobileControls() {
     pad.classList.add('active');
   }
   pinPad.addEventListener('touchstart', e => startJoystick(pinJoystick, pinPad, e), { passive: false });
-  camPad.addEventListener('touchstart', e => startJoystick(camJoystick, camPad, e), { passive: false });
+
+  // 카메라 조이스틱: 더블탭 시 기본 시점 복귀, 싱글탭은 조이스틱 시작
+  let camLastTap = 0;
+  camPad.addEventListener('touchstart', e => {
+    const now = Date.now();
+    if (now - camLastTap < 300) {
+      // 더블탭 — 카메라 기본 위치로 fly
+      e.preventDefault();
+      state.flyTarget = {
+        pos:  new THREE.Vector3(FLOOR.CX, 80, FLOOR.D + 55),
+        look: new THREE.Vector3(FLOOR.CX, 0, FLOOR.CZ),
+      };
+      camLastTap = 0;
+      return;
+    }
+    camLastTap = now;
+    startJoystick(camJoystick, camPad, e);
+  }, { passive: false });
 
   document.addEventListener('touchmove', (e) => {
     for (const t of e.changedTouches) {
