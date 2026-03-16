@@ -23,6 +23,7 @@ const state = {
   pendingRoom: null,       // URL ?room= 파라미터
   chatTimers: new Map(),   // userId → timerId (말풍선 자동 삭제용)
   activeFilter: null,      // 타입별 필터 (null = 전체)
+  floorWasVisible: false,
 };
 
 // ── URL 파라미터 ──────────────────────────────────────────────
@@ -56,6 +57,7 @@ controls.minDistance = 10;
 controls.maxDistance = 160;
 controls.enableDamping = true;
 controls.dampingFactor = 0.08;
+controls.touches = { ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_PAN };
 controls.mouseButtons = { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE };
 
 const raycaster = new THREE.Raycaster();
@@ -396,6 +398,23 @@ const userPins = new Map();
 // ── 연결 끊김 상태 관리 ───────────────────────────────────────
 const disconnectedPins = new Set();
 
+// ── 모바일 조이스틱 상태 ──────────────────────────────────────
+const pinJoystick = { active: false, id: -1, bx: 0, by: 0, dx: 0, dy: 0, fast: false };
+const camJoystick = { active: false, id: -1, bx: 0, by: 0, dx: 0, dy: 0, fast: false };
+let lastPinEmit = 0;
+
+// ── 채팅 최근 메시지 (유저 목록 표시용) ──────────────────────
+const userLastChat = new Map(); // userId → message
+
+// ── 조이스틱 위치 동기화 (패널 표시 시 위로 이동) ─────────────
+function syncJoystickPos() {
+  const mc = document.querySelector('.mobile-controls');
+  if (!mc) return;
+  const chatH  = !document.getElementById('chat-bar').hidden ? 60 : 0;
+  const panelH = !document.getElementById('room-info-panel').hidden ? 132 : 0;
+  mc.style.setProperty('--jpad-extra', Math.max(chatH, panelH) + 'px');
+}
+
 function markPinDisconnected(id) {
   const pin = userPins.get(id);
   if (!pin || disconnectedPins.has(id)) return;
@@ -535,6 +554,13 @@ socket.on('chat-message', ({ id, message, color }) => {
   if (!showChatBubble(id, message, color)) {
     setTimeout(() => showChatBubble(id, message, color), 300);
   }
+  // 유저 목록에 최근 메시지 표시 (5초 후 자동 삭제)
+  userLastChat.set(id, message);
+  renderUserListFromCache();
+  setTimeout(() => {
+    userLastChat.delete(id);
+    renderUserListFromCache();
+  }, 5000);
 });
 
 function checkOnboarding() {
@@ -575,23 +601,69 @@ function flyTo(tx, tz, height = 22) {
   };
 }
 
+function rotateCamera(deltaTheta, deltaPhi) {
+  const offset = new THREE.Vector3().subVectors(camera.position, controls.target);
+  const spherical = new THREE.Spherical().setFromVector3(offset);
+  spherical.theta += deltaTheta;
+  spherical.phi = Math.max(0.05, Math.min(Math.PI / 2 - 0.02, spherical.phi + deltaPhi));
+  offset.setFromSpherical(spherical);
+  camera.position.copy(controls.target).add(offset);
+  camera.lookAt(controls.target);
+  controls.update();
+}
+
 // ── 회의실 하이라이트 ─────────────────────────────────────────
 function highlightRoomById(roomId) {
   const mesh = roomMeshes.find(m => m.userData.room.id === roomId);
   if (!mesh) return;
   flyTo(mesh.userData.room.x + mesh.userData.room.w / 2, mesh.userData.room.z + mesh.userData.room.d / 2);
   showRoomInfo(mesh.userData.room);
-  // 하이라이트 애니메이션 (3초간)
-  const orig = mesh.userData.originalEmissive;
-  let elapsed = 0;
-  const interval = setInterval(() => {
-    elapsed += 100;
-    mesh.material.emissiveIntensity = 0.08 + 0.5 * Math.abs(Math.sin(elapsed / 200));
-    if (elapsed >= 3000) {
-      clearInterval(interval);
-      mesh.material.emissiveIntensity = orig;
+  flashRoom(mesh);
+}
+
+// 아주 강렬한 반짝임 — rAF 기반 (6초, 초당 ~8회 점멸, 후반부 서서히 감쇠)
+function flashRoom(mesh) {
+  const origIntensity = mesh.userData.originalEmissive;
+  const origColor     = mesh.material.emissive.clone();
+  const flashColor    = new THREE.Color(0xffffff); // 흰색으로 극대화
+  const DURATION      = 6000;  // ms
+  const FADE_START    = 4000;  // 이후 감쇠
+  const start         = performance.now();
+
+  // 이미 실행 중이면 이전 rAF 취소
+  if (mesh.userData.flashCancel) mesh.userData.flashCancel();
+  let raf;
+
+  function tick(now) {
+    const elapsed = now - start;
+    if (elapsed >= DURATION) {
+      mesh.material.emissive.copy(origColor);
+      mesh.material.emissiveIntensity = origIntensity;
+      mesh.userData.flashCancel = null;
+      return;
     }
-  }, 100);
+
+    // 감쇠 배율 (4초 이후 1→0 선형 감소)
+    const decay = elapsed < FADE_START
+      ? 1.0
+      : 1.0 - (elapsed - FADE_START) / (DURATION - FADE_START);
+
+    // 고주파(8Hz) + 저주파(2Hz) 합성으로 불규칙한 느낌
+    const fast = Math.sin(elapsed * 0.050);   // ~8 Hz
+    const slow = Math.sin(elapsed * 0.013);   // ~2 Hz
+    const wave = Math.abs(fast) * 0.7 + Math.abs(slow) * 0.3;
+
+    const intensity = wave * 2.2 * decay;     // 최대 2.2 (아주 밝음)
+
+    // 점멸 상태에 따라 흰색 ↔ 원래 색 보간
+    mesh.material.emissive.lerpColors(origColor, flashColor, Math.min(1, intensity * 0.5));
+    mesh.material.emissiveIntensity = intensity;
+
+    raf = requestAnimationFrame(tick);
+  }
+
+  mesh.userData.flashCancel = () => cancelAnimationFrame(raf);
+  raf = requestAnimationFrame(tick);
 }
 
 // ── 인터랙션: 마우스 ──────────────────────────────────────────
@@ -698,6 +770,7 @@ window.addEventListener('keydown', e => {
     if (!state.joined) return;
     e.preventDefault();
     document.getElementById('chat-bar').hidden = false;
+    syncJoystickPos();
     document.getElementById('chat-input').focus();
     return;
   }
@@ -714,6 +787,7 @@ window.addEventListener('keydown', e => {
     if (state.pickingMode) exitPickMode();
     document.getElementById('room-info-panel').hidden = true;
     document.getElementById('chat-bar').hidden = true;
+    syncJoystickPos();
     return;
   }
 
@@ -733,20 +807,27 @@ window.addEventListener('keydown', e => {
 });
 
 // ── 채팅 입력 ─────────────────────────────────────────────────
+function submitChat() {
+  const input = document.getElementById('chat-input');
+  const msg = input.value.trim().slice(0, 20);
+  if (msg && state.joined) socket.emit('chat', { message: msg });
+  input.value = '';
+  document.getElementById('chat-bar').hidden = true;
+  input.blur();
+  syncJoystickPos();
+}
+
 document.getElementById('chat-input').addEventListener('keydown', e => {
-  if (e.key === 'Enter') {
-    const msg = e.target.value.trim().slice(0, 20);
-    if (msg && state.joined) socket.emit('chat', { message: msg });
-    e.target.value = '';
-    document.getElementById('chat-bar').hidden = true;
-    e.target.blur();
-  }
+  if (e.key === 'Enter') { e.preventDefault(); submitChat(); }
   if (e.key === 'Escape') {
     e.target.value = '';
     document.getElementById('chat-bar').hidden = true;
     e.target.blur();
+    syncJoystickPos();
   }
 });
+
+document.getElementById('chat-send-btn').addEventListener('click', submitChat);
 
 // ── 도면 토글 ────────────────────────────────────────────────
 document.getElementById('floor-toggle-btn').addEventListener('click', () => {
@@ -765,10 +846,26 @@ function showRoomInfo(room) {
     `<span class="ri-type-dot" style="background:${ti.color}"></span>${ti.label}`;
   panel.querySelector('.ri-type').style.color = ti.color;
   panel.querySelector('.ri-nav').onclick = () => flyTo(room.x + room.w / 2, room.z + room.d / 2);
+
+  // 링크 복사 버튼
+  const linkBtn = panel.querySelector('.ri-link');
+  linkBtn.textContent = '🔗 링크 복사';
+  linkBtn.classList.remove('copied');
+  linkBtn.onclick = () => {
+    const url = `${location.origin}${location.pathname}?room=${encodeURIComponent(room.id)}`;
+    navigator.clipboard.writeText(url).then(() => {
+      linkBtn.textContent = '✓ 복사됨';
+      linkBtn.classList.add('copied');
+      setTimeout(() => { linkBtn.textContent = '🔗 링크 복사'; linkBtn.classList.remove('copied'); }, 2000);
+    });
+  };
+
   panel.hidden = false;
+  syncJoystickPos();
 }
 document.getElementById('room-info-close').onclick = () => {
   document.getElementById('room-info-panel').hidden = true;
+  syncJoystickPos();
 };
 
 // ── 입장 ─────────────────────────────────────────────────────
@@ -791,6 +888,8 @@ if (urlRoom) {
 
 // ── 위치 설정 모드 ────────────────────────────────────────────
 function enterPickMode() {
+  state.floorWasVisible = floor.visible;
+  floor.visible = true; // raycaster needs visible floor
   state.pickingMode = true;
   renderer.domElement.style.cursor = 'crosshair';
   const btn = document.getElementById('locate-btn');
@@ -800,6 +899,7 @@ function enterPickMode() {
 }
 function exitPickMode() {
   state.pickingMode = false;
+  floor.visible = state.floorWasVisible;
   renderer.domElement.style.cursor = 'default';
   const btn = document.getElementById('locate-btn');
   btn.textContent = '📍 내 위치 설정';
@@ -816,12 +916,14 @@ document.getElementById('locate-btn').addEventListener('click', () => {
 
 // ── 타입 필터 ─────────────────────────────────────────────────
 function initTypeFilters() {
-  const wrap = document.getElementById('type-filters');
-  wrap.innerHTML = Object.entries(ROOM_TYPES).map(([type, ti]) =>
+  const filterHTML = Object.entries(ROOM_TYPES).map(([type, ti]) =>
     `<button class="filter-btn" data-type="${type}" onclick="setTypeFilter('${type}')" style="--filter-color:${ti.color}">
       <span class="filter-dot" style="background:${ti.color}"></span>${ti.label}
     </button>`
   ).join('');
+  document.getElementById('type-filters').innerHTML = filterHTML;
+  const mobFilters = document.getElementById('mob-type-filters');
+  if (mobFilters) mobFilters.innerHTML = filterHTML;
 }
 
 window.setTypeFilter = (type) => {
@@ -829,7 +931,8 @@ window.setTypeFilter = (type) => {
   document.querySelectorAll('.filter-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.type === state.activeFilter);
   });
-  renderRoomList(document.getElementById('search-input').value);
+  const q = document.getElementById('mob-search')?.value || document.getElementById('search-input').value;
+  renderRoomList(q);
 };
 
 // ── 방 목록 & 검색 ────────────────────────────────────────────
@@ -873,6 +976,12 @@ function renderRoomList(query = '') {
       ? `${filtered.length} / ${ROOMS.length}`
       : ROOMS.length;
   }
+
+  const mobList = document.getElementById('mob-room-list');
+  if (mobList) mobList.innerHTML = document.getElementById('room-list').innerHTML;
+
+  const mobBadge = document.getElementById('mob-room-count');
+  if (mobBadge) mobBadge.textContent = document.getElementById('room-count')?.textContent || '';
 }
 
 document.getElementById('search-input').addEventListener('input', e => renderRoomList(e.target.value));
@@ -882,6 +991,7 @@ window.focusRoom = (id) => {
   if (!room) return;
   flyTo(room.x + room.w / 2, room.z + room.d / 2);
   showRoomInfo(room);
+  window.closeSheet?.();
 };
 
 // 방 링크 복사
@@ -896,17 +1006,35 @@ window.copyRoomLink = (e, roomId) => {
 };
 
 // ── 유저 목록 ─────────────────────────────────────────────────
+let _cachedUsers = [];
+
 function renderUserList(users) {
-  const placed = users.filter(u => u.x !== null);
+  _cachedUsers = users;
+  renderUserListFromCache();
+}
+
+function renderUserListFromCache() {
+  const placed = _cachedUsers.filter(u => u.x !== null);
   document.getElementById('user-count').textContent = placed.length;
-  document.getElementById('user-list').innerHTML = placed.map(u => `
-    <div class="user-item" onclick="flyToUser(${u.x}, ${u.z}, '${u.id}')">
+  document.getElementById('user-list').innerHTML = placed.map(u => {
+    const lastMsg = userLastChat.get(u.id) || '';
+    const chatHtml = lastMsg
+      ? `<span class="u-chat">💬 ${lastMsg}</span>`
+      : '';
+    return `<div class="user-item" onclick="flyToUser(${u.x}, ${u.z}, '${u.id}')">
       <span class="u-emoji-icon">${u.emoji || '🙂'}</span>
       <span class="u-dot" style="background:${u.color}"></span>
-      <span class="u-name">${u.name}</span>
+      <div class="u-info">
+        <span class="u-name">${u.name}</span>
+        ${chatHtml}
+      </div>
       <span class="u-go">→ 이동</span>
-    </div>
-  `).join('') || '<div class="u-empty">아직 위치를 설정한 사람이 없어요</div>';
+    </div>`;
+  }).join('') || '<div class="u-empty">아직 위치를 설정한 사람이 없어요</div>';
+  const mobUserList = document.getElementById('mob-user-list');
+  if (mobUserList) mobUserList.innerHTML = document.getElementById('user-list').innerHTML;
+  const mobUserCount = document.getElementById('mob-user-count');
+  if (mobUserCount) mobUserCount.textContent = placed.length;
 }
 window.flyToUser = (x, z, userId) => {
   flyTo(x, z, 18);
@@ -972,7 +1100,90 @@ document.getElementById('profile-save-btn').addEventListener('click', () => {
   if (state.joined) socket.emit('update-profile', { name, emoji: state.myEmoji });
   updateProfileBtn();
   document.getElementById('profile-modal').hidden = true;
+  // 서버 브로드캐스트 대기 없이 즉시 핀 이름 반영
+  const myPin = userPins.get(state.myId);
+  if (myPin?.userData.nameDiv) {
+    myPin.userData.nameDiv.innerHTML =
+      `<span style="margin-right:3px">${state.myEmoji}</span>${name}<span class="me-tag">나</span>`;
+  }
 });
+
+// ── 모바일 시트 & 채팅 ────────────────────────────────────────
+window.openSheet = (name) => {
+  document.getElementById('sheet-backdrop').hidden = false;
+  document.getElementById(`sheet-${name}`).hidden = false;
+};
+window.closeSheet = () => {
+  document.getElementById('sheet-backdrop').hidden = true;
+  document.querySelectorAll('.bottom-sheet').forEach(s => { s.hidden = true; });
+};
+window.openMobChat = () => {
+  if (!state.joined) return;
+  document.getElementById('chat-bar').hidden = false;
+  syncJoystickPos();
+  document.getElementById('chat-input').focus();
+};
+
+// ── 모바일 조이스틱 ───────────────────────────────────────────
+const JOYSTICK_MAX_R    = 22;
+const JOYSTICK_FAST_THR = JOYSTICK_MAX_R * 0.65; // ~14px — 이 이상 드래그 시 고속 모드
+
+function updateJoystick(js, knobEl, touch) {
+  const rawDx   = touch.clientX - js.bx;
+  const rawDy   = touch.clientY - js.by;
+  const rawDist = Math.hypot(rawDx, rawDy);
+  const clipped = Math.min(JOYSTICK_MAX_R, rawDist);
+  const angle   = Math.atan2(rawDy, rawDx);
+  if (knobEl) knobEl.style.transform =
+    `translate(${(clipped * Math.cos(angle)).toFixed(1)}px, ${(clipped * Math.sin(angle)).toFixed(1)}px)`;
+  js.dx   = rawDx / 38;
+  js.dy   = rawDy / 38;
+  js.fast = rawDist > JOYSTICK_FAST_THR;
+}
+function endJoystick(js, padEl, knobEl) {
+  js.active = false; js.dx = 0; js.dy = 0; js.fast = false;
+  if (padEl)  { padEl.classList.remove('active'); padEl.classList.remove('speed-fast'); }
+  if (knobEl) knobEl.style.transform = '';
+}
+
+function initMobileControls() {
+  const pinPad  = document.getElementById('pin-jpad');
+  const pinKnob = document.getElementById('pin-knob');
+  const camPad  = document.getElementById('cam-jpad');
+  const camKnob = document.getElementById('cam-knob');
+  if (!pinPad || !camPad) return;
+
+  function startJoystick(js, pad, e) {
+    e.preventDefault();
+    const t = e.targetTouches[0];
+    js.active = true; js.id = t.identifier;
+    js.bx = t.clientX; js.by = t.clientY;
+    js.dx = 0; js.dy = 0;
+    pad.classList.add('active');
+  }
+  pinPad.addEventListener('touchstart', e => startJoystick(pinJoystick, pinPad, e), { passive: false });
+  camPad.addEventListener('touchstart', e => startJoystick(camJoystick, camPad, e), { passive: false });
+
+  document.addEventListener('touchmove', (e) => {
+    for (const t of e.changedTouches) {
+      if (pinJoystick.active && t.identifier === pinJoystick.id) {
+        updateJoystick(pinJoystick, pinKnob, t);
+        pinPad.classList.toggle('speed-fast', pinJoystick.fast);
+      }
+      if (camJoystick.active && t.identifier === camJoystick.id) updateJoystick(camJoystick, camKnob, t);
+    }
+  }, { passive: true });
+
+  document.addEventListener('touchend', (e) => {
+    for (const t of e.changedTouches) {
+      if (pinJoystick.active && t.identifier === pinJoystick.id) endJoystick(pinJoystick, pinPad, pinKnob);
+      if (camJoystick.active && t.identifier === camJoystick.id) endJoystick(camJoystick, camPad, camKnob);
+    }
+  });
+
+  // mob-search
+  document.getElementById('mob-search')?.addEventListener('input', e => renderRoomList(e.target.value));
+}
 
 // ── 리사이즈 ─────────────────────────────────────────────────
 function onResize() {
@@ -1011,6 +1222,29 @@ function animate() {
   // 스폰 원 외곽 링 펄싱
   spawnRing.material.opacity = 0.2 + 0.3 * Math.abs(Math.sin(t * 1.2));
 
+  // 모바일 핀 조이스틱
+  if (pinJoystick.active && state.joined) {
+    const now = performance.now();
+    if (now - lastPinEmit > 80 && (Math.abs(pinJoystick.dx) > 0.05 || Math.abs(pinJoystick.dy) > 0.05)) {
+      const pin = userPins.get(state.myId);
+      const cx = pin ? pin.position.x : FLOOR.CX;
+      const cz = pin ? pin.position.z : FLOOR.CZ;
+      const spd = pinJoystick.fast ? 0.8 : 0.4; // 65% 이상 드래그 시 2배 속도
+      const nx = Math.max(0, Math.min(FLOOR.W, cx + Math.max(-1, Math.min(1, pinJoystick.dx)) * spd));
+      const nz = Math.max(0, Math.min(FLOOR.D, cz + Math.max(-1, Math.min(1, pinJoystick.dy)) * spd));
+      socket.emit('set-location', { x: nx, z: nz });
+      lastPinEmit = now;
+    }
+  }
+
+  // 모바일 카메라 회전 조이스틱
+  if (camJoystick.active && (Math.abs(camJoystick.dx) > 0.05 || Math.abs(camJoystick.dy) > 0.05)) {
+    rotateCamera(
+      -Math.max(-1, Math.min(1, camJoystick.dx)) * 0.04,
+       Math.max(-1, Math.min(1, camJoystick.dy)) * 0.025
+    );
+  }
+
   userPins.forEach((pin, id) => {
     if (disconnectedPins.has(id)) {
       // 끊김 핀: 느린 깜빡임
@@ -1048,6 +1282,7 @@ window.addEventListener('resize', onResize);
 onResize();
 initTypeFilters();
 renderRoomList();
+initMobileControls();
 animate();
 
 // 입장 오버레이가 표시될 때 이름 입력창 자동 포커스

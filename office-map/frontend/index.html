@@ -2,7 +2,9 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <title>서울숲 사옥 LF층 — 회의실 찾기</title>
   <link rel="stylesheet" href="style.css" />
   <script type="importmap">
@@ -103,7 +105,10 @@
         <div class="ri-id"></div>
         <div class="ri-name"></div>
         <div class="ri-type"></div>
-        <button class="ri-nav btn-nav">📍 이 위치로 이동</button>
+        <div class="ri-actions">
+          <button class="ri-nav btn-nav">📍 이 위치로 이동</button>
+          <button class="ri-link btn-nav-link">🔗 링크 복사</button>
+        </div>
       </div>
 
       <!-- 조작 안내 -->
@@ -122,7 +127,33 @@
       <div id="chat-bar" class="chat-bar" hidden>
         <span class="chat-label">💬</span>
         <input id="chat-input" class="chat-input" type="text" maxlength="20" placeholder="최대 20자 입력 후 Enter…" autocomplete="off" />
+        <button id="chat-send-btn" class="chat-send-btn">전송</button>
       </div>
+
+      <!-- 모바일: 조이스틱 컨트롤 -->
+      <div class="mobile-controls">
+        <div class="joystick-wrap" id="pin-joystick">
+          <div class="joystick-pad" id="pin-jpad">
+            <div class="joystick-knob" id="pin-knob">🕹</div>
+          </div>
+          <span class="joystick-label">핀 이동</span>
+        </div>
+        <div class="joystick-wrap" id="cam-joystick">
+          <div class="joystick-pad" id="cam-jpad">
+            <div class="joystick-knob" id="cam-knob">🔄</div>
+          </div>
+          <span class="joystick-label">화면 회전</span>
+        </div>
+      </div>
+
+      <!-- 모바일: 하단 내비게이션 -->
+      <nav class="mobile-nav">
+        <button class="mob-nav-btn" onclick="openSheet('rooms')"><span>🏢</span><span>회의실</span></button>
+        <button class="mob-nav-btn" onclick="openSheet('users')"><span>👥</span><span>접속자</span></button>
+        <button class="mob-nav-btn" onclick="document.getElementById('locate-btn').click()"><span>📍</span><span>위치</span></button>
+        <button class="mob-nav-btn" onclick="openMobChat()"><span>💬</span><span>채팅</span></button>
+        <button class="mob-nav-btn" onclick="document.getElementById('profile-btn').click()"><span id="mob-profile-icon">🙂</span><span>프로필</span></button>
+      </nav>
     </div>
 
     <!-- 우측 패널 -->
@@ -141,6 +172,29 @@
       </div>
     </aside>
 
+  </div>
+
+  <!-- 모바일: 바텀 시트 -->
+  <div id="sheet-backdrop" class="sheet-backdrop" onclick="closeSheet()" hidden></div>
+  <div id="sheet-rooms" class="bottom-sheet" hidden>
+    <div class="sheet-handle-bar"></div>
+    <div class="sheet-header">
+      <span class="sheet-title">🏢 회의실 <span id="mob-room-count" class="room-count-badge"></span></span>
+      <button class="sheet-close" onclick="closeSheet()">✕</button>
+    </div>
+    <div class="search-wrap">
+      <input id="mob-search" class="search-input" type="text" placeholder="방 이름 또는 번호 검색..." />
+    </div>
+    <div id="mob-type-filters" class="filter-wrap"></div>
+    <div id="mob-room-list" class="room-list"></div>
+  </div>
+  <div id="sheet-users" class="bottom-sheet" hidden>
+    <div class="sheet-handle-bar"></div>
+    <div class="sheet-header">
+      <span class="sheet-title">👥 지금 <span id="mob-user-count">0</span>명</span>
+      <button class="sheet-close" onclick="closeSheet()">✕</button>
+    </div>
+    <div id="mob-user-list" class="user-list"></div>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
