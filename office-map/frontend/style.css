@@ -304,19 +304,28 @@ body { font-family: -apple-system, 'Noto Sans KR', sans-serif; background: var(-
   transition: box-shadow .2s;
 }
 .entrance-callout {
-  font-size: 10px;
-  font-weight: 700;
-  color: var(--ec, #22c55e);
-  background: rgba(15,23,42,0.85);
-  border: 1px solid var(--ec, #22c55e);
-  border-radius: 6px;
-  padding: 2px 7px;
-  pointer-events: none;
-  white-space: nowrap;
+  font-size: 10px; font-weight: 700;
+  color: var(--ec, #22c55e); background: rgba(15,23,42,0.85);
+  border: 1px solid var(--ec, #22c55e); border-radius: 6px;
+  padding: 2px 7px; pointer-events: none; white-space: nowrap;
   backdrop-filter: blur(4px);
   box-shadow: 0 0 8px var(--ec, #22c55e);
-  text-shadow: 0 0 6px var(--ec, #22c55e);
-  line-height: 1.4;
+  text-shadow: 0 0 6px var(--ec, #22c55e); line-height: 1.4;
+}
+
+/* 형광 동그라미 입구/엘리베이터 마커 — CSS2DObject (항상 동일 화면 크기) */
+.entrance-marker {
+  width: 68px; height: 68px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 900;
+  color: #060d02;
+  pointer-events: none;
+  text-align: center;
+  line-height: 1.25;
+  white-space: nowrap;
+  border: 2.5px solid rgba(255,255,255,0.88);
+  /* 글로우 효과는 JS에서 inline boxShadow로 설정 */
 }
 
 .me-tag {
