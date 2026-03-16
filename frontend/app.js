@@ -142,48 +142,15 @@ function initRooms() {
   return meshes;
 }
 
-// 형광 동그라미 라벨 — CanvasTexture
-function makeCircleLabel(text, fillColor) {
-  const SIZE = 512;
-  const canvas = document.createElement('canvas');
-  canvas.width = canvas.height = SIZE;
-  const ctx = canvas.getContext('2d');
-  const cx = SIZE / 2, cy = SIZE / 2;
-  const r  = SIZE * 0.41;
-
-  // 외부 글로우 (방사형 그라데이션)
-  const grd = ctx.createRadialGradient(cx, cy, r * 0.5, cx, cy, r * 1.25);
-  grd.addColorStop(0, fillColor + 'bb');
-  grd.addColorStop(1, fillColor + '00');
-  ctx.beginPath();
-  ctx.arc(cx, cy, r * 1.25, 0, Math.PI * 2);
-  ctx.fillStyle = grd;
-  ctx.fill();
-
-  // 메인 원 (형광 채우기)
-  ctx.beginPath();
-  ctx.arc(cx, cy, r, 0, Math.PI * 2);
-  ctx.fillStyle = fillColor;
-  ctx.globalAlpha = 0.92;
-  ctx.fill();
-  ctx.globalAlpha = 1;
-
-  // 흰색 테두리
-  ctx.beginPath();
-  ctx.arc(cx, cy, r, 0, Math.PI * 2);
-  ctx.strokeStyle = 'rgba(255,255,255,0.9)';
-  ctx.lineWidth = SIZE * 0.025;
-  ctx.stroke();
-
-  // 텍스트 (자동 크기: 글자 수에 맞게)
-  const fontSize = Math.floor(SIZE * (text.length > 4 ? 0.155 : 0.195));
-  ctx.font = `900 ${fontSize}px -apple-system, "Noto Sans KR", Arial, sans-serif`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillStyle = '#060d02';
-  ctx.fillText(text, cx, cy);
-
-  return new THREE.CanvasTexture(canvas);
+// 형광 동그라미 마커 div — CSS2DObject용 (원근 무관 항상 동일 크기)
+function makeEntranceMarkerDiv(text, colorStr) {
+  const div = document.createElement('div');
+  div.className = 'entrance-marker';
+  div.textContent = text;
+  div.style.background   = colorStr;
+  div.style.boxShadow    = `0 0 10px ${colorStr}, 0 0 24px ${colorStr}99`;
+  div.style.fontSize     = text.length > 4 ? '8.5px' : '10.5px';
+  return div;
 }
 
 function initEntrances() {
@@ -208,16 +175,21 @@ function initEntrances() {
     g.position.set(entry.x, 0, entry.z);
     scene.add(g);
 
-    // ── 형광 동그라미 텍스트 라벨 (CanvasTexture, 바닥 중앙) ──
-    const labelText = entry.callout || entry.name;
-    const labelTex  = makeCircleLabel(labelText, colorStr);
-    const labelPlane = new THREE.Mesh(
-      new THREE.PlaneGeometry(CIRCLE_R * 2, CIRCLE_R * 2),
-      new THREE.MeshBasicMaterial({ map: labelTex, transparent: true, depthWrite: false, side: THREE.DoubleSide })
+    // ── 바닥 글로우 원 (시각적 위치 표시, 낮은 투명도) ──────────
+    const glow = new THREE.Mesh(
+      new THREE.CircleGeometry(CIRCLE_R * 1.1, 40),
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.18, depthWrite: false })
     );
-    labelPlane.rotation.x = -Math.PI / 2;
-    labelPlane.position.set(0, 0.12, 0);
-    g.add(labelPlane);
+    glow.rotation.x = -Math.PI / 2;
+    glow.position.y = 0.04;
+    g.add(glow);
+
+    // ── CSS2DObject 형광 동그라미 라벨 (항상 동일 화면 크기) ────
+    const labelText  = entry.callout || entry.name;
+    const markerDiv  = makeEntranceMarkerDiv(labelText, colorStr);
+    const markerObj  = new CSS2DObject(markerDiv);
+    markerObj.position.set(0, 0.5, 0); // 바닥 바로 위
+    g.add(markerObj);
 
     // ── 방향 화살표 (동그라미 테두리에 화살촉 끝이 닿음) ──────
     if (entry.direction) {
@@ -573,6 +545,15 @@ function flyTo(tx, tz, height = 22) {
   };
 }
 
+// 현재 줌 레벨·각도를 유지하며 대상 위치로만 이동 (확대 없음)
+function flyToRoom(tx, tz) {
+  const offset = new THREE.Vector3().subVectors(camera.position, controls.target);
+  state.flyTarget = {
+    pos:  new THREE.Vector3(tx, 0, tz).add(offset),
+    look: new THREE.Vector3(tx, 0, tz),
+  };
+}
+
 function rotateCamera(deltaTheta, deltaPhi) {
   const offset = new THREE.Vector3().subVectors(camera.position, controls.target);
   const spherical = new THREE.Spherical().setFromVector3(offset);
@@ -588,7 +569,7 @@ function rotateCamera(deltaTheta, deltaPhi) {
 function highlightRoomById(roomId) {
   const mesh = roomMeshes.find(m => m.userData.room.id === roomId);
   if (!mesh) return;
-  flyTo(mesh.userData.room.x + mesh.userData.room.w / 2, mesh.userData.room.z + mesh.userData.room.d / 2);
+  flyToRoom(mesh.userData.room.x + mesh.userData.room.w / 2, mesh.userData.room.z + mesh.userData.room.d / 2);
   showRoomInfo(mesh.userData.room);
   flashRoom(mesh);
 }
@@ -956,7 +937,7 @@ document.getElementById('search-input').addEventListener('input', e => renderRoo
 window.focusRoom = (id) => {
   const room = ROOMS.find(r => r.id === id);
   if (!room) return;
-  flyTo(room.x + room.w / 2, room.z + room.d / 2);
+  flyToRoom(room.x + room.w / 2, room.z + room.d / 2);
   showRoomInfo(room);
   window.closeSheet?.();
 };

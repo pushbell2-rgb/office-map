@@ -79,7 +79,7 @@ export const ROOMS = [
 ];
 
 export const ENTRANCES = [
-  { id: 'ENT-1', name: '입구 1',     callout: '헥톤입구', type: 'entrance', x: 120.96, z: 35.81, direction: 'z-' },
-  { id: 'ENT-2', name: '입구 2',     callout: 'GC입구',  type: 'entrance', x: 100.40, z: 37.00, direction: 'x-' },
+  { id: 'ENT-1', name: '입구 1',     callout: '헥톤입구', type: 'entrance', x: 120.96, z: 39.50, direction: 'z-' },
+  { id: 'ENT-2', name: '입구 2',     callout: 'GC입구',  type: 'entrance', x:  96.00, z: 37.00, direction: 'x-' },
   { id: 'ELV-1', name: '엘리베이터',                  type: 'elevator', x:  13.85, z: 44.50, direction: null },
 ];
