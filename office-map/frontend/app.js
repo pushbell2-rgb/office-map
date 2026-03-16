@@ -142,95 +142,117 @@ function initRooms() {
   return meshes;
 }
 
-function makeEntranceLabel(icon, name, colorStr) {
-  const W = 660, H = 156;
+// 형광 동그라미 라벨 — CanvasTexture
+function makeCircleLabel(text, fillColor) {
+  const SIZE = 512;
   const canvas = document.createElement('canvas');
-  canvas.width = W; canvas.height = H;
+  canvas.width = canvas.height = SIZE;
   const ctx = canvas.getContext('2d');
+  const cx = SIZE / 2, cy = SIZE / 2;
+  const r  = SIZE * 0.41;
 
-  // 텍스트 글로우
-  ctx.shadowColor = colorStr;
-  ctx.shadowBlur = 18;
-  ctx.fillStyle = colorStr;
-  ctx.font = `bold 60px "Noto Sans KR", sans-serif`;
+  // 외부 글로우 (방사형 그라데이션)
+  const grd = ctx.createRadialGradient(cx, cy, r * 0.5, cx, cy, r * 1.25);
+  grd.addColorStop(0, fillColor + 'bb');
+  grd.addColorStop(1, fillColor + '00');
+  ctx.beginPath();
+  ctx.arc(cx, cy, r * 1.25, 0, Math.PI * 2);
+  ctx.fillStyle = grd;
+  ctx.fill();
+
+  // 메인 원 (형광 채우기)
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fillStyle = fillColor;
+  ctx.globalAlpha = 0.92;
+  ctx.fill();
+  ctx.globalAlpha = 1;
+
+  // 흰색 테두리
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+  ctx.lineWidth = SIZE * 0.025;
+  ctx.stroke();
+
+  // 텍스트 (자동 크기: 글자 수에 맞게)
+  const fontSize = Math.floor(SIZE * (text.length > 4 ? 0.155 : 0.195));
+  ctx.font = `900 ${fontSize}px -apple-system, "Noto Sans KR", Arial, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(`${icon}  ${name}`, W / 2, H / 2);
-  ctx.shadowBlur = 0;
+  ctx.fillStyle = '#060d02';
+  ctx.fillText(text, cx, cy);
 
-  const tex = new THREE.CanvasTexture(canvas);
-  return tex;
+  return new THREE.CanvasTexture(canvas);
 }
 
 function initEntrances() {
   const animData = [];
 
+  // 동그라미 반지름 (world units) — 화살표 끝점 기준
+  const CIRCLE_R = 3.0;
+  // 화살표 치수
+  const SHAFT_L = 3.5, HEAD_L = 1.5;
+  const SHAFT_R = 0.35, HEAD_R  = 1.0;
+  const ARROW_Y = 0.5;
+  // 화살표 꼬리 → 동그라미 테두리에 화살촉 끝이 닿도록 기점 계산
+  const ARROW_ORIGIN_D = CIRCLE_R + SHAFT_L + HEAD_L; // = 8.0
+
   ENTRANCES.forEach(entry => {
     const isElevator = entry.type === 'elevator';
-    const color = isElevator ? 0xfacc15 : 0x22c55e;
-    const colorStr = isElevator ? '#facc15' : '#22c55e';
-    const icon = isElevator ? '🛗' : '🚪';
+    // 형광색: 입구=네온 그린, 엘리베이터=네온 옐로
+    const color    = isElevator ? 0xffee00 : 0x39ff14;
+    const colorStr = isElevator ? '#ffee00' : '#39ff14';
 
     const g = new THREE.Group();
     g.position.set(entry.x, 0, entry.z);
     scene.add(g);
 
-    // 바닥 원형 마커
-    const circle = new THREE.Mesh(
-      new THREE.CircleGeometry(1.8, 32),
-      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.45, depthWrite: false })
+    // ── 형광 동그라미 텍스트 라벨 (CanvasTexture, 바닥 중앙) ──
+    const labelText = entry.callout || entry.name;
+    const labelTex  = makeCircleLabel(labelText, colorStr);
+    const labelPlane = new THREE.Mesh(
+      new THREE.PlaneGeometry(CIRCLE_R * 2, CIRCLE_R * 2),
+      new THREE.MeshBasicMaterial({ map: labelTex, transparent: true, depthWrite: false, side: THREE.DoubleSide })
     );
-    circle.rotation.x = -Math.PI / 2;
-    circle.position.y = 0.05;
-    g.add(circle);
+    labelPlane.rotation.x = -Math.PI / 2;
+    labelPlane.position.set(0, 0.12, 0);
+    g.add(labelPlane);
 
-    // 링 외곽선
-    const ring = new THREE.Mesh(
-      new THREE.RingGeometry(1.8, 2.1, 32),
-      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false })
-    );
-    ring.rotation.x = -Math.PI / 2;
-    ring.position.y = 0.06;
-    g.add(ring);
-
-    // 두꺼운 방향 화살표 + 슬라이딩 쉐브론 애니메이션
+    // ── 방향 화살표 (동그라미 테두리에 화살촉 끝이 닿음) ──────
     if (entry.direction) {
-      const SHAFT_L = 3.8, HEAD_L = 1.8;
-      const SHAFT_R = 0.35, HEAD_R = 1.0;
-      const Y = 0.5;
-
       let dir, origin;
       if (entry.direction === 'z-') {
         dir    = new THREE.Vector3(0, 0, -1);
-        origin = new THREE.Vector3(0, Y, 5.0);
+        origin = new THREE.Vector3(0, ARROW_Y, ARROW_ORIGIN_D);
       } else {
         dir    = new THREE.Vector3(-1, 0, 0);
-        origin = new THREE.Vector3(5.0, Y, 0);
+        origin = new THREE.Vector3(ARROW_ORIGIN_D, ARROW_Y, 0);
       }
 
-      // 샤프트 (두꺼운 실린더)
+      // 샤프트
       const shaftCenter = origin.clone().addScaledVector(dir, SHAFT_L / 2);
       const shaft = new THREE.Mesh(
         new THREE.CylinderGeometry(SHAFT_R, SHAFT_R, SHAFT_L, 12),
-        new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.35, transparent: true, opacity: 0.88 })
+        new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.55, transparent: true, opacity: 0.92 })
       );
       shaft.position.copy(shaftCenter);
       if (entry.direction === 'z-') shaft.rotation.x =  Math.PI / 2;
       else                          shaft.rotation.z = -Math.PI / 2;
       g.add(shaft);
 
-      // 화살촉 (큰 콘)
+      // 화살촉 (끝점 = 동그라미 테두리)
       const headCenter = origin.clone().addScaledVector(dir, SHAFT_L + HEAD_L / 2);
       const head = new THREE.Mesh(
         new THREE.ConeGeometry(HEAD_R, HEAD_L, 12),
-        new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.5, transparent: true, opacity: 0.95 })
+        new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.7, transparent: true, opacity: 0.98 })
       );
       head.position.copy(headCenter);
       if (entry.direction === 'z-') head.rotation.x = -Math.PI / 2;
       else                          head.rotation.z =  Math.PI / 2;
       g.add(head);
 
-      // 슬라이딩 쉐브론 3개 (방향 흐름 애니메이션)
+      // 슬라이딩 쉐브론 (화살표 꼬리 → 동그라미 테두리까지)
       const chevEnd = origin.clone().addScaledVector(dir, SHAFT_L + HEAD_L);
       const chevrons = [];
       for (let i = 0; i < 3; i++) {
@@ -244,57 +266,7 @@ function initEntrances() {
         g.add(chev);
         chevrons.push(chev);
       }
-
       animData.push({ chevrons, startPos: origin.clone(), endPos: chevEnd.clone() });
-    }
-
-    // 바닥 직접 텍스트 라벨 (CanvasTexture → 바닥 평면)
-    const labelTex = makeEntranceLabel(icon, entry.name, colorStr);
-    const labelPlane = new THREE.Mesh(
-      new THREE.PlaneGeometry(16.5, 3.9),
-      new THREE.MeshBasicMaterial({ map: labelTex, transparent: true, depthWrite: false, side: THREE.DoubleSide })
-    );
-    labelPlane.rotation.x = -Math.PI / 2;
-    // 화살표 꼬리(접근 방향) 바로 아래에 배치
-    if (entry.direction === 'z-') {
-      labelPlane.position.set(0, 0.12, 7.5);   // 꼬리 z=5.0 바로 아래
-    } else if (entry.direction === 'x-') {
-      labelPlane.position.set(0, 0.12, 5.5);   // 화살표 아래(카메라 방향)
-    } else {
-      labelPlane.position.set(0, 0.12, 3.5);
-    }
-    g.add(labelPlane);
-
-    // 콜아웃 3D 라벨 + 연결선 (callout 있는 입구만)
-    if (entry.callout) {
-      const LABEL_Y = 20;
-      const POLE_BASE = 0.5;
-      const poleHeight = LABEL_Y - POLE_BASE;
-
-      // 수직 기둥 (CylinderGeometry — WebGL은 LineWidth > 1 미지원)
-      const pole = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.08, 0.08, poleHeight, 6),
-        new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9 })
-      );
-      pole.position.set(0, POLE_BASE + poleHeight / 2, 0);
-      g.add(pole);
-
-      // 기둥 글로우 (살짝 두꺼운 반투명 외곽)
-      const poleGlow = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.18, 0.18, poleHeight, 6),
-        new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.18 })
-      );
-      poleGlow.position.copy(pole.position);
-      g.add(poleGlow);
-
-      // CSS2D 라벨
-      const calloutDiv = document.createElement('div');
-      calloutDiv.className = 'entrance-callout';
-      calloutDiv.textContent = entry.callout;
-      calloutDiv.style.setProperty('--ec', colorStr);
-      const calloutLabel = new CSS2DObject(calloutDiv);
-      calloutLabel.position.set(0, LABEL_Y, 0);
-      g.add(calloutLabel);
     }
   });
 
