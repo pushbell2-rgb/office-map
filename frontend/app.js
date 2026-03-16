@@ -384,14 +384,20 @@ let lastPinEmit = 0;
 // ── 채팅 최근 메시지 (유저 목록 표시용) ──────────────────────
 const userLastChat = new Map(); // userId → message
 
-// ── 조이스틱 위치 동기화 (패널 표시 시 위로 이동) ─────────────
+// ── 조이스틱 위치 동기화 (팝업 실제 높이 기준으로 위로 이동)
 function syncJoystickPos() {
   const mc = document.querySelector('.mobile-controls');
   if (!mc) return;
-  const chatH  = !document.getElementById('chat-bar').hidden ? 60 : 0;
-  const panelH = !document.getElementById('room-info-panel').hidden ? 132 : 0;
+  const chatEl  = document.getElementById('chat-bar');
+  const panelEl = document.getElementById('room-info-panel');
+  const chatH   = !chatEl.hidden  ? chatEl.offsetHeight  + 14 : 0;
+  const panelH  = !panelEl.hidden ? panelEl.offsetHeight + 14 : 0;
   mc.style.setProperty('--jpad-extra', Math.max(chatH, panelH) + 'px');
 }
+
+// ── 나침반 ────────────────────────────────────────────────────
+const compassRingEl = document.getElementById('compass-ring');
+let lastCompassTheta = null;
 
 function markPinDisconnected(id) {
   const pin = userPins.get(id);
@@ -888,8 +894,24 @@ function exitPickMode() {
   btn.classList.remove('active');
   document.getElementById('pick-hint').hidden = true;
 }
+// 전체 보기: 정상(top-down) 시점, 최대 축소
 document.getElementById('reset-camera-btn').addEventListener('click', () => {
-  flyTo(FLOOR.CX, FLOOR.CZ, 80);
+  state.flyTarget = {
+    pos:  new THREE.Vector3(FLOOR.CX, 150, FLOOR.CZ),
+    look: new THREE.Vector3(FLOOR.CX, 0, FLOOR.CZ),
+  };
+});
+
+// 나침반 클릭 → 기본 방위각(theta=0)으로 복귀 (줌/기울기 유지)
+document.getElementById('compass')?.addEventListener('click', () => {
+  const offset = new THREE.Vector3().subVectors(camera.position, controls.target);
+  const spherical = new THREE.Spherical().setFromVector3(offset);
+  spherical.theta = 0;
+  offset.setFromSpherical(spherical);
+  state.flyTarget = {
+    pos:  new THREE.Vector3().addVectors(controls.target, offset),
+    look: controls.target.clone(),
+  };
 });
 
 document.getElementById('locate-btn').addEventListener('click', () => {
@@ -1094,10 +1116,14 @@ document.getElementById('profile-save-btn').addEventListener('click', () => {
 window.openSheet = (name) => {
   document.getElementById('sheet-backdrop').hidden = false;
   document.getElementById(`sheet-${name}`).hidden = false;
+  const mc = document.querySelector('.mobile-controls');
+  if (mc) mc.style.display = 'none';
 };
 window.closeSheet = () => {
   document.getElementById('sheet-backdrop').hidden = true;
   document.querySelectorAll('.bottom-sheet').forEach(s => { s.hidden = true; });
+  const mc = document.querySelector('.mobile-controls');
+  if (mc) mc.style.display = '';
 };
 window.openMobChat = () => {
   if (!state.joined) return;
@@ -1143,18 +1169,35 @@ function initMobileControls() {
     js.dx = 0; js.dy = 0;
     pad.classList.add('active');
   }
-  pinPad.addEventListener('touchstart', e => startJoystick(pinJoystick, pinPad, e), { passive: false });
+  // 핀 조이스틱: 더블탭 시 내 위치로 카메라 이동
+  let pinLastTap = 0;
+  pinPad.addEventListener('touchstart', e => {
+    const now = Date.now();
+    if (now - pinLastTap < 300) {
+      e.preventDefault();
+      const myPin = userPins.get(state.myId);
+      if (myPin) flyToRoom(myPin.position.x, myPin.position.z);
+      pinLastTap = 0;
+      return;
+    }
+    pinLastTap = now;
+    startJoystick(pinJoystick, pinPad, e);
+  }, { passive: false });
 
   // 카메라 조이스틱: 더블탭 시 기본 시점 복귀, 싱글탭은 조이스틱 시작
   let camLastTap = 0;
   camPad.addEventListener('touchstart', e => {
     const now = Date.now();
     if (now - camLastTap < 300) {
-      // 더블탭 — 카메라 기본 위치로 fly
+      // 더블탭 — 회전(theta)만 0으로 초기화, 줌/위치 유지
       e.preventDefault();
+      const offset = new THREE.Vector3().subVectors(camera.position, controls.target);
+      const spherical = new THREE.Spherical().setFromVector3(offset);
+      spherical.theta = 0;
+      offset.setFromSpherical(spherical);
       state.flyTarget = {
-        pos:  new THREE.Vector3(FLOOR.CX, 80, FLOOR.D + 55),
-        look: new THREE.Vector3(FLOOR.CX, 0, FLOOR.CZ),
+        pos:  new THREE.Vector3().addVectors(controls.target, offset),
+        look: controls.target.clone(),
       };
       camLastTap = 0;
       return;
@@ -1269,6 +1312,15 @@ function animate() {
     camera.position.lerp(state.flyTarget.pos, 0.06);
     controls.target.lerp(state.flyTarget.look, 0.06);
     if (camera.position.distanceTo(state.flyTarget.pos) < 0.5) state.flyTarget = null;
+  }
+
+  // 나침반 회전 업데이트 (방위각에 따라 나침반 링 회전)
+  if (compassRingEl) {
+    const theta = controls.getAzimuthalAngle();
+    if (lastCompassTheta === null || Math.abs(theta - lastCompassTheta) > 0.003) {
+      compassRingEl.style.transform = `rotate(${(-theta * 180 / Math.PI).toFixed(1)}deg)`;
+      lastCompassTheta = theta;
+    }
   }
 
   controls.update();

@@ -96,6 +96,16 @@
         <button id="profile-btn" class="btn-topbar btn-profile">🙂 나</button>
       </div>
 
+      <!-- 나침반 -->
+      <div id="compass" class="compass" title="클릭: 방향 초기화">
+        <div class="compass-ring" id="compass-ring">
+          <div class="cd cd-e">동<span>한양대역</span></div>
+          <div class="cd cd-w">서<span>행당공원</span></div>
+          <div class="cd cd-n">북<span>중랑천</span></div>
+          <div class="cd cd-s">남<span>왕십리역</span></div>
+        </div>
+      </div>
+
       <!-- 위치 지정 힌트 -->
       <div id="pick-hint" class="pick-hint" hidden>바닥을 클릭하여 현재 위치를 지정하세요</div>
 
@@ -135,14 +145,14 @@
         <div class="joystick-wrap" id="pin-joystick">
           <div class="joystick-pad" id="pin-jpad">
             <div class="joystick-knob" id="pin-knob">🕹</div>
+            <span class="j-label">핀 이동<br><span class="j-label-sub">더블탭: 내위치</span></span>
           </div>
-          <span class="joystick-label">핀 이동</span>
         </div>
         <div class="joystick-wrap" id="cam-joystick">
           <div class="joystick-pad" id="cam-jpad">
             <div class="joystick-knob" id="cam-knob">🔄</div>
+            <span class="j-label">화면 회전<br><span class="j-label-sub">더블탭: 초기화</span></span>
           </div>
-          <span class="joystick-label">화면 회전<br><span style="font-size:9px;opacity:.7">더블탭: 초기화</span></span>
         </div>
       </div>
 
