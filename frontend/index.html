@@ -5,8 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>서울숲 사옥 LF층 — 회의실 찾기</title>
   <link rel="stylesheet" href="style.css" />
-
-  <!-- Three.js importmap -->
   <script type="importmap">
   {
     "imports": {
@@ -24,31 +22,59 @@
       <div class="overlay-icon">🏢</div>
       <h1 class="overlay-title">서울숲 사옥 LF층</h1>
       <p class="overlay-sub">3D 회의실 찾기 & 위치 공유</p>
-      <input
-        id="name-input"
-        type="text"
-        placeholder="이름을 입력하세요"
-        maxlength="20"
-        autocomplete="off"
-      />
+      <p class="overlay-sub" style="margin-bottom:10px;font-size:12px;">아이콘 선택</p>
+      <div class="emoji-grid" id="join-emoji-grid"></div>
+      <input id="name-input" type="text" placeholder="이름을 입력하세요" maxlength="20" autocomplete="off" />
       <button id="join-btn" class="btn-join">입장하기</button>
     </div>
   </div>
 
+  <!-- 프로필 편집 모달 -->
+  <div id="profile-modal" class="modal-overlay" hidden>
+    <div class="modal-card">
+      <h2 class="modal-title">프로필 편집</h2>
+      <p style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">아이콘 선택</p>
+      <div class="emoji-grid" id="profile-emoji-grid"></div>
+      <input id="profile-name-input" type="text" placeholder="이름" maxlength="20" autocomplete="off" style="margin-top:12px;" />
+      <div class="modal-actions">
+        <button id="profile-cancel-btn" class="btn-secondary">취소</button>
+        <button id="profile-save-btn" class="btn-join" style="flex:1;padding:10px;font-size:14px;">저장</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 온보딩 가이드 -->
+  <div id="onboard-overlay" class="onboard-overlay" hidden>
+    <div class="onboard-card">
+      <div style="font-size:36px;margin-bottom:12px;">🗺</div>
+      <h2 class="onboard-title">LF층 3D 지도 사용법</h2>
+      <div class="onboard-steps">
+        <div class="onboard-step"><span class="onboard-icon">🔍</span><div><b>회의실 검색</b> — 좌측 검색창에 이름·번호 입력, 클릭하면 카메라 이동</div></div>
+        <div class="onboard-step"><span class="onboard-icon">📍</span><div><b>내 위치 설정</b> — 상단 "내 위치 설정" 클릭 후 도면 위 클릭</div></div>
+        <div class="onboard-step"><span class="onboard-icon">👥</span><div><b>동료 찾기</b> — 우측 패널에서 동료 핀 확인, "→ 이동" 클릭</div></div>
+        <div class="onboard-step"><span class="onboard-icon">💬</span><div><b>채팅</b> — T키로 말풍선 메시지 입력 (최대 20자, 5초 후 자동 삭제)</div></div>
+        <div class="onboard-step"><span class="onboard-icon">⌨</span><div><b>핀 이동</b> — 방향키로 내 위치 핀 이동</div></div>
+      </div>
+      <button id="onboard-close" class="btn-join" style="width:100%;margin-top:20px;font-size:15px;">시작하기 →</button>
+    </div>
+  </div>
+
+  <!-- 복사 완료 토스트 -->
+  <div id="copy-toast" class="copy-toast" hidden>🔗 링크가 복사되었습니다!</div>
+
   <!-- 메인 레이아웃 -->
   <div class="app-layout">
 
-    <!-- 좌측 패널: 방 목록 -->
+    <!-- 좌측 패널 -->
     <aside class="sidebar left-sidebar">
       <div class="sidebar-header">
-        <div class="sidebar-title">🏢 LF층 공간</div>
+        <div class="sidebar-title">🏢 LF층 공간 <span id="room-count" class="room-count-badge"></span></div>
       </div>
       <div class="search-wrap">
         <input id="search-input" class="search-input" type="text" placeholder="방 이름 또는 번호 검색..." />
       </div>
+      <div id="type-filters" class="filter-wrap"></div>
       <div id="room-list" class="room-list"></div>
-
-      <!-- 범례 -->
       <div class="legend-wrap">
         <div class="legend-title">범례</div>
         <div id="legend" class="legend"></div>
@@ -61,18 +87,17 @@
 
       <!-- 상단 바 -->
       <div class="top-bar">
-        <span class="top-title">서울숲 사옥 LF층 3D 맵</span>
-        <div class="top-controls">
-          <button id="locate-btn" class="btn-locate">📍 내 위치 설정</button>
-        </div>
+        <span class="top-title">서울숲 LF층</span>
+        <button id="floor-toggle-btn" class="btn-topbar">🗺 도면 보기</button>
+        <button id="reset-camera-btn" class="btn-topbar">🏠 전체 보기</button>
+        <button id="locate-btn" class="btn-locate">📍 내 위치 설정</button>
+        <button id="profile-btn" class="btn-topbar btn-profile">🙂 나</button>
       </div>
 
       <!-- 위치 지정 힌트 -->
-      <div id="pick-hint" class="pick-hint" hidden>
-        바닥을 클릭하여 현재 위치를 지정하세요
-      </div>
+      <div id="pick-hint" class="pick-hint" hidden>바닥을 클릭하여 현재 위치를 지정하세요</div>
 
-      <!-- 방 정보 패널 (클릭 시 표시) -->
+      <!-- 방 정보 패널 -->
       <div id="room-info-panel" class="room-info-panel" hidden>
         <button id="room-info-close" class="ri-close">✕</button>
         <div class="ri-id"></div>
@@ -83,14 +108,24 @@
 
       <!-- 조작 안내 -->
       <div class="hint-bar">
-        <span>🖱 드래그: 회전</span>
+        <span>🖱 좌클릭 드래그: 이동</span>
+        <span>🖱 우클릭 드래그: 회전</span>
         <span>🔍 스크롤: 줌</span>
-        <span>⌨ 우클릭+드래그: 이동</span>
-        <span>🖱 방 클릭: 정보 보기</span>
+        <span>⌨ 방향키: 핀이동</span>
+        <span>💬 T키: 채팅</span>
+        <span>🔍 /키: 검색</span>
+        <span>❓ ?키: 도움말</span>
+        <span>⎋ ESC: 취소</span>
+      </div>
+
+      <!-- 채팅 입력바 -->
+      <div id="chat-bar" class="chat-bar" hidden>
+        <span class="chat-label">💬</span>
+        <input id="chat-input" class="chat-input" type="text" maxlength="20" placeholder="최대 20자 입력 후 Enter…" autocomplete="off" />
       </div>
     </div>
 
-    <!-- 우측 패널: 실시간 사용자 -->
+    <!-- 우측 패널 -->
     <aside class="sidebar right-sidebar">
       <div class="sidebar-header">
         <div class="sidebar-title">👥 지금 사무실에 <span id="user-count">0</span>명</div>
@@ -98,7 +133,6 @@
       <div id="user-list" class="user-list">
         <div class="u-empty">위치를 설정한 사람이 없어요</div>
       </div>
-
       <div class="locate-section">
         <p class="locate-desc">내 위치를 설정하면<br/>다른 사람이 찾아올 수 있어요.</p>
         <button class="btn-locate-side" onclick="document.getElementById('locate-btn').click()">
