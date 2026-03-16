@@ -432,6 +432,8 @@ function markPinDisconnected(id) {
       scene.remove(userPins.get(id));
       userPins.delete(id);
       disconnectedPins.delete(id);
+      userLastChat.delete(id);
+      renderUserListFromCache();
     }
   }, 30000);
 }
@@ -528,7 +530,7 @@ function showChatBubble(id, message, color) {
   const timer = setTimeout(() => {
     bubbleDiv.style.display = 'none';
     state.chatTimers.delete(id);
-  }, 5000);
+  }, 10000);
   state.chatTimers.set(id, timer);
   return true;
 }
@@ -538,13 +540,9 @@ socket.on('chat-message', ({ id, message, color }) => {
   if (!showChatBubble(id, message, color)) {
     setTimeout(() => showChatBubble(id, message, color), 300);
   }
-  // 유저 목록에 최근 메시지 표시 (5초 후 자동 삭제)
+  // 유저 목록에 마지막 채팅 영구 표시 (유저 퇴장 시 삭제)
   userLastChat.set(id, message);
   renderUserListFromCache();
-  setTimeout(() => {
-    userLastChat.delete(id);
-    renderUserListFromCache();
-  }, 5000);
 });
 
 function checkOnboarding() {
