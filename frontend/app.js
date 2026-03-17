@@ -685,6 +685,23 @@ function flashRoom(mesh) {
   raf = requestAnimationFrame(tick);
 }
 
+// ── 드래그 판별 (클릭 vs 패닝) ───────────────────────────────
+const DRAG_THRESHOLD = 6; // px 이상 움직이면 드래그로 간주
+let _pointerDownX = 0, _pointerDownY = 0, _didDrag = false;
+
+renderer.domElement.addEventListener('mousedown', e => {
+  _pointerDownX = e.clientX; _pointerDownY = e.clientY; _didDrag = false;
+});
+renderer.domElement.addEventListener('mousemove', e => {
+  if (e.buttons > 0 && Math.hypot(e.clientX - _pointerDownX, e.clientY - _pointerDownY) > DRAG_THRESHOLD)
+    _didDrag = true;
+});
+renderer.domElement.addEventListener('touchstart', e => {
+  if (e.touches.length === 1) {
+    _pointerDownX = e.touches[0].clientX; _pointerDownY = e.touches[0].clientY; _didDrag = false;
+  }
+}, { passive: true });
+
 // ── 인터랙션: 마우스 ──────────────────────────────────────────
 function getMouseNDC(e) {
   const rect = renderer.domElement.getBoundingClientRect();
@@ -713,6 +730,7 @@ renderer.domElement.addEventListener('mousemove', (e) => {
 });
 
 renderer.domElement.addEventListener('click', (e) => {
+  if (_didDrag) return; // 드래그 후 click 이벤트 무시
   const { x, y } = getMouseNDC(e);
   mouse.set(x, y);
   raycaster.setFromCamera(mouse, camera);
@@ -737,6 +755,8 @@ renderer.domElement.addEventListener('click', (e) => {
 renderer.domElement.addEventListener('touchend', (e) => {
   if (!state.joined || e.changedTouches.length !== 1) return;
   const touch = e.changedTouches[0];
+  // 터치 이동 거리가 임계값 초과 시 드래그로 간주, 팝업 무시
+  if (Math.hypot(touch.clientX - _pointerDownX, touch.clientY - _pointerDownY) > DRAG_THRESHOLD) return;
   const rect = renderer.domElement.getBoundingClientRect();
   const tx = ((touch.clientX - rect.left) / rect.width) * 2 - 1;
   const ty = -((touch.clientY - rect.top) / rect.height) * 2 + 1;
