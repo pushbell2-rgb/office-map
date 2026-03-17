@@ -1240,6 +1240,28 @@ function showRoomInfo(room) {
       });
       riActions.appendChild(btn);
     });
+
+    // 내 위치에서 경로 버튼
+    const myPin = userPins.get(state.myId);
+    if (myPin) {
+      const myBtn = document.createElement('button');
+      myBtn.className = 'ri-nav-from';
+      myBtn.textContent = '📍 내 위치에서 경로';
+      myBtn.addEventListener('click', () => {
+        const fromX = myPin.position.x, fromZ = myPin.position.z;
+        const toX   = room.x + room.w / 2, toZ   = room.z + room.d / 2;
+        const path  = getNavPath(fromX, fromZ, toX, toZ, room.id);
+        showPath(path);
+        setRoomHighlight(room);
+        panel.hidden = true;
+        syncJoystickPos();
+        state.flyTarget = {
+          pos:  new THREE.Vector3(FLOOR.CX, 150, FLOOR.CZ),
+          look: new THREE.Vector3(FLOOR.CX, 0, FLOOR.CZ),
+        };
+      });
+      riActions.appendChild(myBtn);
+    }
   }
 
   panel.hidden = false;
@@ -1375,7 +1397,10 @@ function renderRoomList(query = '') {
           <span class="ri-dot" style="background:${ti.color}"></span>
           <span class="ri-id-sm">${hl(r.id)}</span>
           <span class="ri-name-sm">${hl(r.name)}</span>
-          <button class="btn-link-room" onclick="copyRoomLink(event,'${r.id}')" title="링크 복사">🔗</button>
+          <div class="ri-item-actions">
+            <button class="btn-go-room" onclick="event.stopPropagation();navigateToRoom('${r.id}')">이동</button>
+            <button class="btn-link-room" onclick="copyRoomLink(event,'${r.id}')" title="링크 복사">🔗</button>
+          </div>
         </div>`;
       }).join('');
 
@@ -1407,6 +1432,14 @@ window.focusRoom = (id) => {
   window.closeSheet?.();
 };
 
+// 이동 버튼 — 카메라를 해당 방으로 근접 이동 후 시트 닫기
+window.navigateToRoom = (id) => {
+  const room = ROOMS.find(r => r.id === id);
+  if (!room) return;
+  flyTo(room.x + room.w / 2, room.z + room.d / 2);
+  window.closeSheet?.();
+};
+
 // 방 링크 복사
 window.copyRoomLink = (e, roomId) => {
   e.stopPropagation();
@@ -1427,8 +1460,7 @@ function renderUserList(users) {
 }
 
 function renderUserListFromCache() {
-  const online     = _cachedUsers.filter(u => !u.disconnected && u.x !== null);
-  const offline    = _cachedUsers.filter(u => u.disconnected);
+  const online = _cachedUsers.filter(u => !u.disconnected && u.x !== null);
   document.getElementById('user-count').textContent = online.length;
 
   const onlineHtml = online.map(u => {
@@ -1442,18 +1474,7 @@ function renderUserListFromCache() {
     </div>`;
   }).join('');
 
-  const offlineHtml = offline.map(u =>
-    `<div class="user-item user-item--offline">
-      <span class="u-emoji-icon">${u.emoji || '🙂'}</span>
-      <span class="u-dot" style="background:#475569"></span>
-      <div class="u-info">
-        <span class="u-name">${u.name}</span>
-        <span class="u-offline-tag">오프라인</span>
-      </div>
-    </div>`
-  ).join('');
-
-  const html = onlineHtml + offlineHtml || '<div class="u-empty">아직 위치를 설정한 사람이 없어요</div>';
+  const html = onlineHtml || '<div class="u-empty">아직 위치를 설정한 사람이 없어요</div>';
   document.getElementById('user-list').innerHTML = html;
   const mobUserList = document.getElementById('mob-user-list');
   if (mobUserList) mobUserList.innerHTML = html;
