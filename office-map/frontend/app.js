@@ -336,16 +336,18 @@ function initSpawnZone() {
 function initCorridors() {
   CORRIDORS.forEach(cor => {
     const cx = cor.x + cor.w / 2, cz = cor.z + cor.d / 2;
+    // 바닥 채우기 — 더 밝고 뚜렷하게
     const fill = new THREE.Mesh(
       new THREE.PlaneGeometry(cor.w, cor.d),
-      new THREE.MeshBasicMaterial({ color: 0x22c55e, transparent: true, opacity: 0.15, depthWrite: false })
+      new THREE.MeshBasicMaterial({ color: 0x4ade80, transparent: true, opacity: 0.40, depthWrite: false })
     );
     fill.rotation.x = -Math.PI / 2;
     fill.position.set(cx, 0.06, cz);
     scene.add(fill);
+    // 테두리 선
     const edges = new THREE.LineSegments(
       new THREE.EdgesGeometry(new THREE.PlaneGeometry(cor.w, cor.d)),
-      new THREE.LineBasicMaterial({ color: 0x22c55e, transparent: true, opacity: 0.30 })
+      new THREE.LineBasicMaterial({ color: 0x86efac, transparent: true, opacity: 0.70 })
     );
     edges.rotation.x = -Math.PI / 2;
     edges.position.set(cx, 0.07, cz);
@@ -415,7 +417,7 @@ function initFacilities() {
     g.add(marker);
     const div = document.createElement('div');
     div.className = `facility-label facility-${fac.type}`;
-    div.textContent = isToilet ? 'T' : 'P';
+    div.innerHTML = isToilet ? '<span>🚾</span> 화장실' : '<span>📞</span> 폰부스';
     const labelObj = new CSS2DObject(div);
     labelObj.position.set(0, 2.0, 0);
     g.add(labelObj);
