@@ -848,6 +848,14 @@ document.getElementById('chat-input').addEventListener('keydown', e => {
 
 document.getElementById('chat-send-btn').addEventListener('click', submitChat);
 
+document.getElementById('chat-input').addEventListener('blur', () => {
+  // 전송 버튼 클릭(터치) 시 blur → click 순서로 발생하므로 click 먼저 처리되게 대기
+  setTimeout(() => {
+    document.getElementById('chat-bar').hidden = true;
+    syncJoystickPos();
+  }, 150);
+});
+
 // ── 도면 토글 ────────────────────────────────────────────────
 document.getElementById('floor-toggle-btn').addEventListener('click', () => {
   floor.visible = !floor.visible;
