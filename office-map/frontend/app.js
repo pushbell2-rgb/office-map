@@ -61,6 +61,9 @@ controls.dampingFactor = 0.08;
 controls.touches = { ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_PAN };
 controls.mouseButtons = { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE };
 
+// 사용자가 직접 조작하면 fly 애니메이션 즉시 취소
+controls.addEventListener('start', () => { state.flyTarget = null; });
+
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 const clock = new THREE.Clock();
@@ -1310,8 +1313,8 @@ function animate() {
   // 모바일 카메라 회전 조이스틱
   if (camJoystick.active && (Math.abs(camJoystick.dx) > 0.05 || Math.abs(camJoystick.dy) > 0.05)) {
     rotateCamera(
-      -Math.max(-1, Math.min(1, camJoystick.dx)) * 0.04,
-       Math.max(-1, Math.min(1, camJoystick.dy)) * 0.025
+       Math.max(-1, Math.min(1, camJoystick.dx)) * 0.04,
+      -Math.max(-1, Math.min(1, camJoystick.dy)) * 0.025
     );
   }
 
