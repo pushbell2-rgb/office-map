@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
-import { ROOMS, ROOM_TYPES, ENTRANCES } from './map-data.js';
+import { ROOMS, ROOM_TYPES, ENTRANCES, CORRIDORS, WALLS, DESKS, FACILITIES } from './map-data.js';
 
 // ── 상수 ─────────────────────────────────────────────────────
 const FLOOR = { W: 140, D: 88, CX: 70, CZ: 44 };
@@ -333,6 +333,244 @@ function initSpawnZone() {
   return ring;
 }
 
+function initCorridors() {
+  CORRIDORS.forEach(cor => {
+    const cx = cor.x + cor.w / 2, cz = cor.z + cor.d / 2;
+    const fill = new THREE.Mesh(
+      new THREE.PlaneGeometry(cor.w, cor.d),
+      new THREE.MeshBasicMaterial({ color: 0x22c55e, transparent: true, opacity: 0.15, depthWrite: false })
+    );
+    fill.rotation.x = -Math.PI / 2;
+    fill.position.set(cx, 0.06, cz);
+    scene.add(fill);
+    const edges = new THREE.LineSegments(
+      new THREE.EdgesGeometry(new THREE.PlaneGeometry(cor.w, cor.d)),
+      new THREE.LineBasicMaterial({ color: 0x22c55e, transparent: true, opacity: 0.30 })
+    );
+    edges.rotation.x = -Math.PI / 2;
+    edges.position.set(cx, 0.07, cz);
+    scene.add(edges);
+  });
+}
+
+function initWalls() {
+  const WALL_H = 3.2;
+  WALLS.forEach(wall => {
+    const mesh = new THREE.Mesh(
+      new THREE.BoxGeometry(wall.w, WALL_H, wall.d),
+      new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.95, metalness: 0.05,
+        emissive: 0x1e293b, emissiveIntensity: 0.2 })
+    );
+    mesh.position.set(wall.x + wall.w / 2, WALL_H / 2, wall.z + wall.d / 2);
+    mesh.castShadow = true;
+    scene.add(mesh);
+    const line = new THREE.LineSegments(
+      new THREE.EdgesGeometry(new THREE.BoxGeometry(wall.w, WALL_H, wall.d)),
+      new THREE.LineBasicMaterial({ color: 0x334155, transparent: true, opacity: 0.6 })
+    );
+    line.position.copy(mesh.position);
+    scene.add(line);
+  });
+}
+
+function initDesks() {
+  DESKS.forEach(desk => {
+    const cx = desk.x + desk.w / 2, cz = desk.z + desk.d / 2;
+    const fill = new THREE.Mesh(
+      new THREE.PlaneGeometry(desk.w, desk.d),
+      new THREE.MeshBasicMaterial({ color: 0xfb7185, transparent: true, opacity: 0.18, depthWrite: false })
+    );
+    fill.rotation.x = -Math.PI / 2;
+    fill.position.set(cx, 0.05, cz);
+    scene.add(fill);
+    const edges = new THREE.LineSegments(
+      new THREE.EdgesGeometry(new THREE.PlaneGeometry(desk.w, desk.d)),
+      new THREE.LineBasicMaterial({ color: 0xfb7185, transparent: true, opacity: 0.35 })
+    );
+    edges.rotation.x = -Math.PI / 2;
+    edges.position.set(cx, 0.055, cz);
+    scene.add(edges);
+    const div = document.createElement('div');
+    div.className = 'desk-label';
+    div.textContent = '💼 desk';
+    const labelObj = new CSS2DObject(div);
+    labelObj.position.set(cx, 0.5, cz);
+    scene.add(labelObj);
+  });
+}
+
+function initFacilities() {
+  FACILITIES.forEach(fac => {
+    const isToilet = fac.type === 'toilet';
+    const color   = isToilet ? 0x60a5fa : 0xf59e0b;
+    const g = new THREE.Group();
+    g.position.set(fac.x, 0, fac.z);
+    scene.add(g);
+    const marker = new THREE.Mesh(
+      new THREE.PlaneGeometry(2.2, 2.2),
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.28, depthWrite: false })
+    );
+    marker.rotation.x = -Math.PI / 2;
+    marker.position.y = 0.06;
+    g.add(marker);
+    const div = document.createElement('div');
+    div.className = `facility-label facility-${fac.type}`;
+    div.textContent = isToilet ? 'T' : 'P';
+    const labelObj = new CSS2DObject(div);
+    labelObj.position.set(0, 2.0, 0);
+    g.add(labelObj);
+  });
+}
+
+// ── 길찾기 (A*) ──────────────────────────────────────────────
+const GRID_RES  = 2;
+const GRID_COLS = Math.ceil(FLOOR.W / GRID_RES); // 70
+const GRID_ROWS = Math.ceil(FLOOR.D / GRID_RES); // 44
+let navGrid = null;
+
+function buildNavGrid() {
+  const walkable = new Uint8Array(GRID_COLS * GRID_ROWS);
+  const walkAreas = [
+    ...CORRIDORS,
+    ...ROOMS.filter(r => r.type === 'lounge'),
+  ];
+  for (let row = 0; row < GRID_ROWS; row++) {
+    for (let col = 0; col < GRID_COLS; col++) {
+      const wx = col * GRID_RES + GRID_RES * 0.5;
+      const wz = row * GRID_RES + GRID_RES * 0.5;
+      for (const area of walkAreas) {
+        if (wx >= area.x && wx < area.x + area.w && wz >= area.z && wz < area.z + area.d) {
+          walkable[row * GRID_COLS + col] = 1;
+          break;
+        }
+      }
+    }
+  }
+  return walkable;
+}
+
+function findNearestWalkableCell(col, row) {
+  if (!navGrid) navGrid = buildNavGrid();
+  col = Math.max(0, Math.min(GRID_COLS - 1, col));
+  row = Math.max(0, Math.min(GRID_ROWS - 1, row));
+  if (navGrid[row * GRID_COLS + col]) return [col, row];
+  for (let r = 1; r < 30; r++) {
+    for (let dc = -r; dc <= r; dc++) {
+      for (let dr = -r; dr <= r; dr++) {
+        if (Math.abs(dc) !== r && Math.abs(dr) !== r) continue;
+        const nc = col + dc, nr = row + dr;
+        if (nc < 0 || nc >= GRID_COLS || nr < 0 || nr >= GRID_ROWS) continue;
+        if (navGrid[nr * GRID_COLS + nc]) return [nc, nr];
+      }
+    }
+  }
+  return [col, row];
+}
+
+function astarPath(fromX, fromZ, toX, toZ) {
+  if (!navGrid) navGrid = buildNavGrid();
+  const [sc, sr] = findNearestWalkableCell(Math.floor(fromX / GRID_RES), Math.floor(fromZ / GRID_RES));
+  const [ec, er] = findNearestWalkableCell(Math.floor(toX / GRID_RES),   Math.floor(toZ / GRID_RES));
+  const N = GRID_COLS * GRID_ROWS;
+  const gScore = new Float32Array(N).fill(Infinity);
+  const parent = new Int32Array(N).fill(-1);
+  const closed = new Uint8Array(N);
+  const key = (c, r) => r * GRID_COLS + c;
+  const h   = (c, r) => Math.abs(c - ec) + Math.abs(r - er);
+  const startK = key(sc, sr);
+  gScore[startK] = 0;
+  const open = [[h(sc, sr), sc, sr]];
+  const DIRS = [[-1,0,1],[1,0,1],[0,-1,1],[0,1,1],[-1,-1,1.414],[-1,1,1.414],[1,-1,1.414],[1,1,1.414]];
+
+  while (open.length > 0) {
+    open.sort((a, b) => a[0] - b[0]);
+    const [, col, row] = open.shift();
+    const k = key(col, row);
+    if (closed[k]) continue;
+    closed[k] = 1;
+    if (col === ec && row === er) {
+      const path = [];
+      let ck = k;
+      while (ck !== -1) {
+        const c2 = ck % GRID_COLS;
+        const r2 = Math.floor(ck / GRID_COLS);
+        path.unshift(new THREE.Vector3(c2 * GRID_RES + GRID_RES * 0.5, 0.13, r2 * GRID_RES + GRID_RES * 0.5));
+        ck = parent[ck];
+      }
+      return path;
+    }
+    for (const [dc, dr, cost] of DIRS) {
+      const nc = col + dc, nr = row + dr;
+      if (nc < 0 || nc >= GRID_COLS || nr < 0 || nr >= GRID_ROWS) continue;
+      const nk = key(nc, nr);
+      if (closed[nk] || !navGrid[nk]) continue;
+      const ng = gScore[k] + cost;
+      if (ng < gScore[nk]) {
+        gScore[nk] = ng;
+        parent[nk] = k;
+        open.push([ng + h(nc, nr), nc, nr]);
+      }
+    }
+  }
+  return null;
+}
+
+// ── 경로 표시 / 제거 ─────────────────────────────────────────
+let pathGroup = null;
+
+function showPath(points) {
+  clearPath();
+  if (!points || points.length < 2) return;
+  pathGroup = new THREE.Group();
+
+  // 부드러운 곡선 튜브
+  const curve   = new THREE.CatmullRomCurve3(points, false, 'centripetal');
+  const tubeGeo = new THREE.TubeGeometry(curve, points.length * 3, 0.32, 6, false);
+  pathGroup.add(new THREE.Mesh(tubeGeo,
+    new THREE.MeshBasicMaterial({ color: 0x22d3ee, transparent: true, opacity: 0.82, depthWrite: false })));
+
+  // 진행 방향 화살표 (일정 간격)
+  const STEP = Math.max(3, Math.floor(points.length / 10));
+  for (let i = STEP; i < points.length - 1; i += STEP) {
+    const p    = points[i];
+    const next = points[Math.min(i + 1, points.length - 1)];
+    const dir  = new THREE.Vector3(next.x - p.x, 0, next.z - p.z).normalize();
+    const angle = Math.atan2(dir.x, dir.z);
+    const arrow = new THREE.Mesh(
+      new THREE.ConeGeometry(0.55, 1.4, 6),
+      new THREE.MeshBasicMaterial({ color: 0x22d3ee, transparent: true, opacity: 0.85, depthWrite: false })
+    );
+    arrow.rotation.x = Math.PI / 2;
+    arrow.rotation.z = -angle;
+    arrow.position.set(p.x, 0.15, p.z);
+    pathGroup.add(arrow);
+  }
+
+  // 출발 마커 (초록)
+  const sm = new THREE.Mesh(new THREE.SphereGeometry(0.9, 12, 12),
+    new THREE.MeshBasicMaterial({ color: 0x10b981, transparent: true, opacity: 0.9 }));
+  sm.position.copy(points[0]).setY(0.6);
+  pathGroup.add(sm);
+
+  // 도착 마커 (빨강)
+  const em = new THREE.Mesh(new THREE.SphereGeometry(0.9, 12, 12),
+    new THREE.MeshBasicMaterial({ color: 0xef4444, transparent: true, opacity: 0.9 }));
+  em.position.copy(points[points.length - 1]).setY(0.6);
+  pathGroup.add(em);
+
+  scene.add(pathGroup);
+}
+
+function clearPath() {
+  if (!pathGroup) return;
+  scene.remove(pathGroup);
+  pathGroup.traverse(o => {
+    if (o.geometry) o.geometry.dispose();
+    if (o.material) o.material.dispose();
+  });
+  pathGroup = null;
+}
+
 function getSpawnPosition() {
   const existing = [];
   userPins.forEach(pin => existing.push({ x: pin.position.x, z: pin.position.z }));
@@ -351,6 +589,10 @@ function getSpawnPosition() {
 // ── 씬 구성 실행 ─────────────────────────────────────────────
 initLights();
 const floor = initFloor();
+initCorridors();
+initWalls();
+initDesks();
+initFacilities();
 const roomMeshes = initRooms();
 const entranceAnimData = initEntrances();
 const spawnRing = initSpawnZone();
@@ -935,11 +1177,39 @@ function showRoomInfo(room) {
     });
   };
 
+  // 출발지 선택 버튼 (라운지에서 경로 안내)
+  panel.querySelectorAll('.ri-nav-from').forEach(b => b.remove());
+  if (!['LOUNGE-1', 'LOUNGE-2'].includes(room.id)) {
+    const riActions = panel.querySelector('.ri-actions');
+    [{ id: 'LOUNGE-1', label: 'Lounge 1' }, { id: 'LOUNGE-2', label: 'Lounge 2' }].forEach(({ id, label }) => {
+      const lounge = ROOMS.find(r => r.id === id);
+      if (!lounge) return;
+      const btn = document.createElement('button');
+      btn.className = 'ri-nav-from';
+      btn.textContent = `🚶 ${label}에서 오기`;
+      btn.addEventListener('click', () => {
+        const fromX = lounge.x + lounge.w / 2, fromZ = lounge.z + lounge.d / 2;
+        const toX   = room.x   + room.w   / 2, toZ   = room.z   + room.d   / 2;
+        const path  = astarPath(fromX, fromZ, toX, toZ);
+        showPath(path);
+        // 경로가 잘 보이도록 중간 지점 위에서 내려다보기
+        const midX = (fromX + toX) / 2, midZ = (fromZ + toZ) / 2;
+        const dist = Math.hypot(toX - fromX, toZ - fromZ);
+        flyTo(midX, midZ, Math.max(50, dist * 0.9));
+        // 버튼 상태 토글
+        panel.querySelectorAll('.ri-nav-from').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+      });
+      riActions.appendChild(btn);
+    });
+  }
+
   panel.hidden = false;
   syncJoystickPos();
 }
 document.getElementById('room-info-close').onclick = () => {
   document.getElementById('room-info-panel').hidden = true;
+  clearPath();
   syncJoystickPos();
 };
 
