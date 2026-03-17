@@ -182,7 +182,7 @@ body { font-family: -apple-system, 'Noto Sans KR', sans-serif; background: var(-
 
 /* 방 정보 패널 */
 .room-info-panel {
-  position: absolute; bottom: 60px; right: 16px;
+  position: absolute; bottom: 60px; left: 16px;
   background: var(--glass);
   border: 1px solid var(--border);
   border-top: 3px solid #6366f1;
@@ -648,15 +648,28 @@ body { font-family: -apple-system, 'Noto Sans KR', sans-serif; background: var(-
   to   { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
 
-/* ── 방 링크 버튼 ───────────────────────────────────────────── */
-.btn-link-room {
-  margin-left: auto; background: none; border: none;
-  cursor: pointer; font-size: 12px; opacity: 0;
-  padding: 2px 4px; border-radius: 4px;
-  transition: opacity .1s, background .1s; flex-shrink: 0;
+/* ── 방 목록 액션 버튼 영역 ─────────────────────────────────── */
+.ri-item-actions {
+  margin-left: auto; display: flex; align-items: center; gap: 4px; flex-shrink: 0;
 }
-.room-item:hover .btn-link-room { opacity: 0.7; }
-.btn-link-room:hover { opacity: 1 !important; background: var(--bg3); }
+.btn-go-room {
+  padding: 3px 9px;
+  background: var(--accent); color: #fff;
+  border: none; border-radius: 6px;
+  font-size: 11px; font-weight: 700; cursor: pointer;
+  white-space: nowrap; flex-shrink: 0;
+  transition: background .1s;
+}
+.btn-go-room:hover { background: var(--accent-h); }
+.btn-link-room {
+  flex-shrink: 0;
+  background: var(--bg3); border: 1px solid var(--border);
+  cursor: pointer; font-size: 12px;
+  padding: 2px 7px; border-radius: 6px;
+  color: var(--text-muted);
+  transition: background .1s, color .1s;
+}
+.btn-link-room:hover { background: var(--bg2); color: var(--text); }
 
 /* ── 유저 목록 이모지 ───────────────────────────────────────── */
 .u-emoji-icon { font-size: 14px; flex-shrink: 0; }
@@ -779,10 +792,10 @@ body { font-family: -apple-system, 'Noto Sans KR', sans-serif; background: var(-
   /* 위치 지정 힌트: 모바일 하단 바 위 */
   .pick-hint { bottom: calc(64px + env(safe-area-inset-bottom, 0px) + 10px); }
 
-  /* 방 정보 패널: 모바일 하단 바 위 */
+  /* 방 정보 패널: 모바일 하단 바 위 (좌우 꽉 채움) */
   .room-info-panel {
     bottom: calc(64px + env(safe-area-inset-bottom, 0px) + 8px);
-    right: 8px; left: 8px; width: auto;
+    left: 8px; right: 8px; width: auto;
   }
 
   /* 채팅 입력바: 모바일 하단 바 위 */
