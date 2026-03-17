@@ -64,10 +64,27 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', () => {
     console.log('[소켓] 연결 끊김:', socket.id);
-    users.delete(socket.id);
-    broadcast();
+    const user = users.get(socket.id);
+    if (user) {
+      user.disconnected = true;
+      user.disconnectedAt = Date.now();
+      broadcast();
+    }
   });
 });
+
+// 24시간마다 끊긴 사용자 정리
+setInterval(() => {
+  const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+  let changed = false;
+  for (const [id, user] of users) {
+    if (user.disconnected && user.disconnectedAt < cutoff) {
+      users.delete(id);
+      changed = true;
+    }
+  }
+  if (changed) broadcast();
+}, 60 * 60 * 1000);
 
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {

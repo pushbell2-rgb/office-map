@@ -32,7 +32,7 @@ export const ROOMS = [
   { id: 'M-22',     name: '도쿄',          type: 'ubicare', x:  10.96, z: 37.12, w:  5.79, d:  4.46 },
 
   // ── 라운지 ──
-  { id: 'LOUNGE-2', name: 'Lounge #2',    type: 'lounge',  x:  27.33, z: 28.50, w: 20.05, d: 30.78 },
+  { id: 'LOUNGE-2', name: 'Lounge #2',    type: 'lounge',  x:  27.33, z: 28.50, w: 15.00, d: 30.78 },
 
   // ── GC 공용 회의실 우측 ──
   { id: 'M-12',     name: '뉴욕',          type: 'gc',      x: 112.37, z:  1.57, w:  8.56, d:  6.67 },
@@ -57,7 +57,7 @@ export const ROOMS = [
   // ── 중앙 구역 ──
   { id: 'P-3',      name: '프로젝트룸#2',  type: 'project', x:  74.32, z: 19.46, w: 11.67, d:  7.72 },
   { id: 'E-1',      name: '임원실',        type: 'edit',    x:  89.53, z: 19.46, w:  4.40, d:  7.72 },
-  { id: 'LOUNGE-1', name: 'Lounge #1',    type: 'lounge',  x:  74.32, z: 32.02, w: 10.16, d: 30.82 },
+  { id: 'LOUNGE-1', name: 'Lounge #1',    type: 'lounge',  x:  74.32, z: 30.00, w: 17.00, d: 32.84 },
   { id: 'M-14',     name: '보라카이',      type: 'ubicare', x:  68.14, z: 46.08, w:  5.50, d:  5.36 },
 
   // ── 임원 + 유비케어 중앙 하단 ──
@@ -99,6 +99,16 @@ export const CORRIDORS = [
   { id: 'COR-B1', x:  9.0, z: 63.0, w: 75.0, d:  7.0 },
   // 우측 수직 복도: M6(x=130.9) 우측 ~ M5/M4
   { id: 'COR-R1', x:136.0, z: 19.0, w:  4.0, d: 16.0 },
+  // M-21~M-18 하단 수평 복도: P-4에서 M-21까지 연결 (COR-V1에 이음)
+  { id: 'COR-T1', x:  0.0, z:  8.24, w: 26.3, d:  2.0 },
+  // E-5/M-16 사이 수직 복도: M-18 하단(z=8.24) → 메인 복도(z=25.5)
+  { id: 'COR-V4', x: 15.42, z:  8.24, w:  4.27, d: 17.26 },
+  // E-1 → 헥톤입구(x≈121): GC입구·헥톤입구까지만 연결
+  { id: 'COR-E1a', x:  94.5, z: 25.5,  w:  5.5,  d: 18.0  }, // S-1 좌측, ENT-2 포함
+  { id: 'COR-E1b', x:  94.5, z: 33.67, w: 17.58, d:  6.33 }, // S-1 하단 → LOUNGE-C 연결
+  { id: 'COR-ENT', x: 117.0, z: 35.81, w:  9.0,  d:  5.0  }, // LOUNGE-C 하단, ENT-1 포함
+  // LOUNGE-C → M-5/M-4/M-3/M-2/M-1 우측 하단 복도
+  { id: 'COR-R2', x: 126.0, z: 35.5, w: 12.0, d: 28.0 },
 ];
 
 // 벽 (통과 불가) — 3D 박스로 렌더링
