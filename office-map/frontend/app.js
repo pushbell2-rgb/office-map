@@ -336,18 +336,18 @@ function initSpawnZone() {
 function initCorridors() {
   CORRIDORS.forEach(cor => {
     const cx = cor.x + cor.w / 2, cz = cor.z + cor.d / 2;
-    // 바닥 채우기 — 더 밝고 뚜렷하게
+    // 흰색 반투명 바닥
     const fill = new THREE.Mesh(
       new THREE.PlaneGeometry(cor.w, cor.d),
-      new THREE.MeshBasicMaterial({ color: 0x4ade80, transparent: true, opacity: 0.40, depthWrite: false })
+      new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.32, depthWrite: false })
     );
     fill.rotation.x = -Math.PI / 2;
     fill.position.set(cx, 0.06, cz);
     scene.add(fill);
-    // 테두리 선
+    // 흰색 테두리 선
     const edges = new THREE.LineSegments(
       new THREE.EdgesGeometry(new THREE.PlaneGeometry(cor.w, cor.d)),
-      new THREE.LineBasicMaterial({ color: 0x86efac, transparent: true, opacity: 0.70 })
+      new THREE.LineBasicMaterial({ color: 0xe2e8f0, transparent: true, opacity: 0.55 })
     );
     edges.rotation.x = -Math.PI / 2;
     edges.position.set(cx, 0.07, cz);
@@ -417,7 +417,7 @@ function initFacilities() {
     g.add(marker);
     const div = document.createElement('div');
     div.className = `facility-label facility-${fac.type}`;
-    div.innerHTML = isToilet ? '<span>🚾</span> 화장실' : '<span>📞</span> 폰부스';
+    div.textContent = isToilet ? '🚾' : '📞';
     const labelObj = new CSS2DObject(div);
     labelObj.position.set(0, 2.0, 0);
     g.add(labelObj);
@@ -525,40 +525,32 @@ function showPath(points) {
   if (!points || points.length < 2) return;
   pathGroup = new THREE.Group();
 
-  // 부드러운 곡선 튜브
-  const curve   = new THREE.CatmullRomCurve3(points, false, 'centripetal');
-  const tubeGeo = new THREE.TubeGeometry(curve, points.length * 3, 0.32, 6, false);
-  pathGroup.add(new THREE.Mesh(tubeGeo,
-    new THREE.MeshBasicMaterial({ color: 0x22d3ee, transparent: true, opacity: 0.82, depthWrite: false })));
-
-  // 진행 방향 화살표 (일정 간격)
-  const STEP = Math.max(3, Math.floor(points.length / 10));
-  for (let i = STEP; i < points.length - 1; i += STEP) {
+  // 빨간 화살표를 복도 위에 일정 간격으로 배치
+  const STEP = Math.max(2, Math.floor(points.length / 18));
+  for (let i = 0; i < points.length - 1; i += STEP) {
     const p    = points[i];
-    const next = points[Math.min(i + 1, points.length - 1)];
-    const dir  = new THREE.Vector3(next.x - p.x, 0, next.z - p.z).normalize();
-    const angle = Math.atan2(dir.x, dir.z);
-    const arrow = new THREE.Mesh(
-      new THREE.ConeGeometry(0.55, 1.4, 6),
-      new THREE.MeshBasicMaterial({ color: 0x22d3ee, transparent: true, opacity: 0.85, depthWrite: false })
+    const next = points[Math.min(i + STEP, points.length - 1)];
+    const dx = next.x - p.x, dz = next.z - p.z;
+    if (Math.hypot(dx, dz) < 0.01) continue;
+    const dir = new THREE.Vector3(dx, 0, dz).normalize();
+    const origin = new THREE.Vector3(
+      (p.x + next.x) / 2,
+      0.22,
+      (p.z + next.z) / 2
     );
-    arrow.rotation.x = Math.PI / 2;
-    arrow.rotation.z = -angle;
-    arrow.position.set(p.x, 0.15, p.z);
+    const arrow = new THREE.ArrowHelper(dir, origin, 2.2, 0xef4444, 1.2, 0.7);
     pathGroup.add(arrow);
   }
 
-  // 출발 마커 (초록)
-  const sm = new THREE.Mesh(new THREE.SphereGeometry(0.9, 12, 12),
-    new THREE.MeshBasicMaterial({ color: 0x10b981, transparent: true, opacity: 0.9 }));
-  sm.position.copy(points[0]).setY(0.6);
-  pathGroup.add(sm);
-
-  // 도착 마커 (빨강)
-  const em = new THREE.Mesh(new THREE.SphereGeometry(0.9, 12, 12),
-    new THREE.MeshBasicMaterial({ color: 0xef4444, transparent: true, opacity: 0.9 }));
-  em.position.copy(points[points.length - 1]).setY(0.6);
-  pathGroup.add(em);
+  // 마지막 화살표는 목적지 방향으로
+  const last2 = points[points.length - 2];
+  const last  = points[points.length - 1];
+  const fdx = last.x - last2.x, fdz = last.z - last2.z;
+  if (Math.hypot(fdx, fdz) > 0.01) {
+    const fdir = new THREE.Vector3(fdx, 0, fdz).normalize();
+    const forigin = new THREE.Vector3(last.x, 0.22, last.z);
+    pathGroup.add(new THREE.ArrowHelper(fdir, forigin, 2.2, 0xef4444, 1.2, 0.7));
+  }
 
   scene.add(pathGroup);
 }
