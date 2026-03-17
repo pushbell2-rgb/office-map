@@ -530,13 +530,39 @@ function showChatBubble(id, message, color) {
   bubbleDiv.style.animation = '';
   bubbleDiv.style.display = 'block';
 
-  // 5초 후 숨김 (마지막 메시지 1개만 유지)
-  const timer = setTimeout(() => {
-    bubbleDiv.style.display = 'none';
-    state.chatTimers.delete(id);
-  }, 10000);
-  state.chatTimers.set(id, timer);
+  // 타이머 없이 영구 표시 — 다음 메시지가 오면 교체
+  state.chatTimers.delete(id);
   return true;
+}
+
+// ── 모바일 플로팅 채팅 로그 ───────────────────────────────────
+const chatLogEl = document.getElementById('chat-log');
+const MAX_CHAT_LOG = 8;
+
+function addChatLogEntry(id, message, color) {
+  if (!chatLogEl) return;
+  const user = _cachedUsers.find(u => u.id === id);
+  const name  = user?.name  || '익명';
+  const emoji = user?.emoji || '🙂';
+
+  const entry = document.createElement('div');
+  entry.className = 'cle';
+  entry.innerHTML =
+    `<span class="cle-name" style="color:${color}">${emoji} ${name}</span>` +
+    `<span class="cle-msg">${message}</span>`;
+  chatLogEl.appendChild(entry);
+
+  // 최대 개수 초과 시 오래된 항목 제거
+  while (chatLogEl.children.length > MAX_CHAT_LOG) {
+    chatLogEl.removeChild(chatLogEl.firstChild);
+  }
+
+  // 15초 후 페이드 아웃
+  setTimeout(() => {
+    entry.style.transition = 'opacity .4s';
+    entry.style.opacity = '0';
+    setTimeout(() => entry.remove(), 400);
+  }, 15000);
 }
 
 socket.on('chat-message', ({ id, message, color }) => {
@@ -544,6 +570,8 @@ socket.on('chat-message', ({ id, message, color }) => {
   if (!showChatBubble(id, message, color)) {
     setTimeout(() => showChatBubble(id, message, color), 300);
   }
+  // 모바일 플로팅 채팅 로그
+  addChatLogEntry(id, message, color);
   // 유저 목록에 마지막 채팅 영구 표시 (유저 퇴장 시 삭제)
   userLastChat.set(id, message);
   renderUserListFromCache();
