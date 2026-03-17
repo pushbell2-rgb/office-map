@@ -375,6 +375,32 @@ body { font-family: -apple-system, 'Noto Sans KR', sans-serif; background: var(-
 .btn-topbar:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
 .btn-profile { max-width: 120px; overflow: hidden; text-overflow: ellipsis; }
 
+/* ── 재연결 배너 ────────────────────────────────────────────── */
+.reconnect-banner {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 1100;
+  display: flex; align-items: center; justify-content: center; gap: 14px;
+  padding: 12px 20px;
+  background: rgba(239,68,68,0.95);
+  backdrop-filter: blur(8px);
+  color: #fff; font-size: 14px; font-weight: 600;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+  animation: slide-down .25s ease;
+}
+.reconnect-banner[hidden] { display: none; }
+@keyframes slide-down {
+  from { transform: translateY(-100%); opacity: 0; }
+  to   { transform: translateY(0);     opacity: 1; }
+}
+.reconnect-btn {
+  padding: 6px 16px;
+  background: #fff; color: #ef4444;
+  border: none; border-radius: 20px;
+  font-size: 13px; font-weight: 700; cursor: pointer;
+  transition: opacity .15s;
+  flex-shrink: 0;
+}
+.reconnect-btn:hover { opacity: 0.85; }
+
 /* ── 나침반 ─────────────────────────────────────────────────── */
 .compass {
   position: absolute; top: 14px; right: 16px;

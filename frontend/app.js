@@ -24,6 +24,7 @@ const state = {
   chatTimers: new Map(),   // userId → timerId (말풍선 자동 삭제용)
   activeFilter: null,      // 타입별 필터 (null = 전체)
   floorWasVisible: false,
+  lastPos: null,           // 마지막 위치 (재연결 시 복구용)
 };
 
 // ── URL 파라미터 ──────────────────────────────────────────────
@@ -559,25 +560,50 @@ socket.on('joined', ({ color }) => {
   state.myColor = color;
   state.myId = socket.id;
   state.joined = true;
-  // 첫 접속 위치: 가운데
-  const sp = getSpawnPosition();
-  socket.emit('set-location', { x: sp.x, z: sp.z });
-  // 프로필 버튼 업데이트
+
+  // 재연결인 경우 마지막 위치 복원, 최초 접속은 스폰 위치
+  const pos = state.lastPos ?? getSpawnPosition();
+  emitLocation(pos.x, pos.z);
+
   updateProfileBtn();
-  // 온보딩 가이드 (최초 방문 시)
-  if (!urlRoom) checkOnboarding();
-  // URL 파라미터 방 처리
+  if (!urlRoom && !state.lastPos) checkOnboarding(); // 재연결 시 온보딩 생략
   if (urlRoom) {
     setTimeout(() => highlightRoomById(urlRoom), 700);
   }
-  // 모바일: 내 스폰 위치로 카메라 이동 (줌 유지)
+  // 모바일: 내 위치로 카메라 이동 (줌 유지)
   if (window.innerWidth <= 768) {
-    setTimeout(() => flyToRoom(sp.x, sp.z), 300);
+    setTimeout(() => flyToRoom(pos.x, pos.z), 300);
   }
 });
 
 socket.on('users-update', syncPins);
 socket.on('connect_error', () => console.warn('[소켓] 연결 실패, 재시도 중...'));
+
+// ── 연결 끊김 / 재연결 ───────────────────────────────────────
+const reconnectBanner = document.getElementById('reconnect-banner');
+
+socket.on('disconnect', () => {
+  reconnectBanner.hidden = false;
+});
+
+socket.on('connect', () => {
+  reconnectBanner.hidden = true;
+  // 재연결 시 세션 자동 복구
+  if (state.joined) {
+    state.myId = socket.id;
+    socket.emit('join', { name: state.myName, emoji: state.myEmoji });
+  }
+});
+
+document.getElementById('reconnect-btn').addEventListener('click', () => {
+  socket.connect();
+});
+
+// ── 위치 이동 (lastPos 자동 저장) ────────────────────────────
+function emitLocation(x, z) {
+  state.lastPos = { x, z };
+  socket.emit('set-location', { x, z });
+}
 
 // ── 카메라 fly-to ─────────────────────────────────────────────
 function flyTo(tx, tz, height = 22) {
@@ -698,7 +724,7 @@ renderer.domElement.addEventListener('click', (e) => {
     const floorHit = raycaster.intersectObject(floor);
     if (floorHit.length > 0) {
       const { x: fx, z: fz } = floorHit[0].point;
-      socket.emit('set-location', { x: fx, z: fz });
+      emitLocation(fx, fz);
       exitPickMode();
     }
   }
@@ -726,7 +752,7 @@ renderer.domElement.addEventListener('touchend', (e) => {
     const floorHit = raycaster.intersectObject(floor);
     if (floorHit.length > 0) {
       const { x: fx, z: fz } = floorHit[0].point;
-      socket.emit('set-location', { x: fx, z: fz });
+      emitLocation(fx, fz);
       exitPickMode();
     }
   }
@@ -751,7 +777,7 @@ window.addEventListener('keydown', e => {
     if (e.key === 'ArrowRight') nx += ARROW_STEP;
     nx = Math.max(0, Math.min(FLOOR.W, nx));
     nz = Math.max(0, Math.min(FLOOR.D, nz));
-    socket.emit('set-location', { x: nx, z: nz });
+    emitLocation(nx, nz);
     return;
   }
 
@@ -1276,7 +1302,7 @@ function animate() {
       const spd = pinJoystick.fast ? 0.8 : 0.4; // 65% 이상 드래그 시 2배 속도
       const nx = Math.max(0, Math.min(FLOOR.W, cx + Math.max(-1, Math.min(1, pinJoystick.dx)) * spd));
       const nz = Math.max(0, Math.min(FLOOR.D, cz + Math.max(-1, Math.min(1, pinJoystick.dy)) * spd));
-      socket.emit('set-location', { x: nx, z: nz });
+      emitLocation(nx, nz);
       lastPinEmit = now;
     }
   }
