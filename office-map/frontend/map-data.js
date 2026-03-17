@@ -83,3 +83,37 @@ export const ENTRANCES = [
   { id: 'ENT-2', name: '입구 2',     callout: 'GC입구',  type: 'entrance', x:  96.00, z: 37.00, direction: 'x-' },
   { id: 'ELV-1', name: '엘리베이터',                  type: 'elevator', x:  13.85, z: 44.50, direction: null },
 ];
+
+// 복도 (이동 가능 경로) — x/z = 좌상단, w/d = 가로/깊이
+export const CORRIDORS = [
+  { id: 'COR-H1', x:  4.3, z:  8.5, w: 90.7, d:  5.5 }, // 메인 수평 복도 (동서 축)
+  { id: 'COR-V1', x:  4.3, z:  0.0, w:  5.7, d:  8.5 }, // 좌측 상단 수직 복도
+  { id: 'COR-V2', x:  0.0, z: 26.0, w:  9.5, d: 42.0 }, // 좌측 하단 수직 복도
+  { id: 'COR-V3', x: 27.3, z: 14.0, w:  7.0, d: 14.5 }, // 라운지2 진입 복도
+  { id: 'COR-R1', x:127.5, z: 32.0, w: 12.5, d:  5.5 }, // 우측 수평 복도 (M-6 주변)
+  { id: 'COR-R2', x:136.0, z: 19.5, w:  4.0, d: 18.5 }, // 우측 수직 복도 (LOUNGE-C~M-5)
+];
+
+// 벽 (통과 불가) — 3D 박스로 렌더링
+export const WALLS = [
+  { id: 'WALL-1', x:  5.5, z: 47.0, w:  3.5, d: 22.5 }, // 좌측 중간 벽
+  { id: 'WALL-2', x: 13.5, z: 66.5, w:  6.5, d: 13.5 }, // 좌측 하단 꺾임 벽
+];
+
+// 사무 공간 데스크 영역 — 반투명 핑크 평면으로 표시
+export const DESKS = [
+  { id: 'DESK-1', x: 37.0, z:  0.0, w: 37.0, d:  8.5 }, // 상단 대형 데스크
+  { id: 'DESK-2', x: 37.0, z:  8.5, w: 14.5, d:  5.0 }, // 상단 소형 데스크
+  { id: 'DESK-3', x: 68.0, z: 32.0, w:  5.5, d: 13.5 }, // 중앙 소형 데스크
+  { id: 'DESK-4', x:115.0, z:  0.0, w: 25.5, d: 54.0 }, // 우측 대형 데스크
+];
+
+// 편의시설 — T: 화장실, P: 폰부스
+export const FACILITIES = [
+  { id: 'T-1',  name: '화장실', type: 'toilet',     x: 24.0, z: 2.5 },
+  { id: 'T-2',  name: '화장실', type: 'toilet',     x: 27.5, z: 2.5 },
+  { id: 'PB-1', name: '폰부스', type: 'phonebooth', x: 37.5, z:  9.5 },
+  { id: 'PB-2', name: '폰부스', type: 'phonebooth', x: 37.5, z: 12.5 },
+  { id: 'PB-3', name: '폰부스', type: 'phonebooth', x: 37.5, z: 15.5 },
+  { id: 'PB-4', name: '폰부스', type: 'phonebooth', x: 40.5, z: 12.5 },
+];

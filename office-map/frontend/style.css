@@ -204,7 +204,7 @@ body { font-family: -apple-system, 'Noto Sans KR', sans-serif; background: var(-
 .ri-name { font-size: 18px; font-weight: 800; margin-bottom: 4px; }
 .ri-type { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; margin-bottom: 14px; }
 .ri-type-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-.ri-actions { display: flex; gap: 8px; }
+.ri-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .btn-nav {
   flex: 1; padding: 8px;
   background: var(--accent); color: #fff;
@@ -222,6 +222,41 @@ body { font-family: -apple-system, 'Noto Sans KR', sans-serif; background: var(-
 }
 .btn-nav-link:hover { background: var(--bg2); color: var(--text); }
 .btn-nav-link.copied { color: #10b981; border-color: #10b981; }
+
+/* 길찾기 출발 버튼 */
+.ri-nav-from {
+  width: 100%; padding: 8px 10px;
+  background: rgba(34,211,238,0.12);
+  color: #22d3ee;
+  border: 1px solid rgba(34,211,238,0.28);
+  border-radius: 8px;
+  cursor: pointer; font-size: 12px; font-weight: 600;
+  transition: background .15s, border-color .15s;
+  text-align: left;
+}
+.ri-nav-from:hover { background: rgba(34,211,238,0.22); }
+.ri-nav-from.active {
+  background: rgba(34,211,238,0.28);
+  border-color: #22d3ee;
+  color: #fff;
+}
+
+/* 편의시설 라벨 (화장실 T, 폰부스 P) */
+.facility-label {
+  font-size: 12px; font-weight: 900;
+  padding: 3px 6px; border-radius: 5px;
+  pointer-events: none; user-select: none;
+  letter-spacing: 0.04em;
+}
+.facility-toilet    { background: rgba(96,165,250,0.82); color: #fff; border: 1px solid #60a5fa; }
+.facility-phonebooth { background: rgba(245,158,11,0.82); color: #fff; border: 1px solid #f59e0b; }
+
+/* 데스크 영역 라벨 */
+.desk-label {
+  font-size: 11px; color: rgba(251,113,133,0.65);
+  pointer-events: none; user-select: none;
+  font-weight: 600; letter-spacing: 0.06em;
+}
 
 /* 조작 안내 */
 .hint-bar {
