@@ -517,39 +517,80 @@ function astarPath(fromX, fromZ, toX, toZ) {
   return null;
 }
 
+// ── 회의실 강조 (클릭 선택 / 경로 목적지) ────────────────────
+let highlightMesh = null;
+let highlightOrigIntensity = 0.08;
+let highlightOrigOpacity   = 0.55;
+
+function setRoomHighlight(room) {
+  clearRoomHighlight();
+  const mesh = roomMeshes.find(m => m.userData.room.id === room.id);
+  if (!mesh) return;
+  highlightMesh            = mesh;
+  highlightOrigIntensity   = mesh.userData.originalEmissive;
+  highlightOrigOpacity     = mesh.userData.originalOpacity;
+  mesh.material.opacity    = Math.min(0.98, highlightOrigOpacity + 0.35);
+}
+
+function clearRoomHighlight() {
+  if (!highlightMesh) return;
+  highlightMesh.material.emissiveIntensity = highlightOrigIntensity;
+  highlightMesh.material.opacity           = highlightOrigOpacity;
+  highlightMesh = null;
+}
+
 // ── 경로 표시 / 제거 ─────────────────────────────────────────
 let pathGroup = null;
+// 화살표 방향 갱신용: { inner: HTMLElement, from: THREE.Vector3, to: THREE.Vector3 }
+const pathArrows = [];
 
 function showPath(points) {
   clearPath();
   if (!points || points.length < 2) return;
   pathGroup = new THREE.Group();
 
-  // 빨간 화살표를 복도 위에 일정 간격으로 배치
+  // 빨간 선 (경로 전체)
+  const lineGeo = new THREE.BufferGeometry().setFromPoints(
+    points.map(p => new THREE.Vector3(p.x, 0.28, p.z))
+  );
+  pathGroup.add(new THREE.Line(lineGeo,
+    new THREE.LineBasicMaterial({ color: 0xef4444, transparent: true, opacity: 0.7 })
+  ));
+
+  // CSS2D 화살표 — from/to를 저장해두고 animate 루프에서 project(camera)로 화면 방향 계산
+  // wrap: CSS2DRenderer가 위치 제어 / inner: 회전 담당 (transform 충돌 방지)
+  const addArrow = (ax, az, dx, dz) => {
+    const len = Math.hypot(dx, dz);
+    const wrap = document.createElement('div');
+    const inner = document.createElement('div');
+    inner.className = 'path-arrow';
+    wrap.appendChild(inner);
+    const obj = new CSS2DObject(wrap);
+    obj.position.set(ax, 0.5, az);
+    pathGroup.add(obj);
+    // 화면 투영용: 화살표 중심(from)과 진행 방향 1unit 앞(to)
+    pathArrows.push({
+      inner,
+      from: new THREE.Vector3(ax, 0.5, az),
+      to:   new THREE.Vector3(ax + dx / len, 0.5, az + dz / len),
+    });
+  };
+
   const STEP = Math.max(2, Math.floor(points.length / 18));
   for (let i = 0; i < points.length - 1; i += STEP) {
     const p    = points[i];
     const next = points[Math.min(i + STEP, points.length - 1)];
     const dx = next.x - p.x, dz = next.z - p.z;
     if (Math.hypot(dx, dz) < 0.01) continue;
-    const dir = new THREE.Vector3(dx, 0, dz).normalize();
-    const origin = new THREE.Vector3(
-      (p.x + next.x) / 2,
-      0.22,
-      (p.z + next.z) / 2
-    );
-    const arrow = new THREE.ArrowHelper(dir, origin, 2.2, 0xef4444, 1.2, 0.7);
-    pathGroup.add(arrow);
+    addArrow((p.x + next.x) / 2, (p.z + next.z) / 2, dx, dz);
   }
 
-  // 마지막 화살표는 목적지 방향으로
+  // 마지막 화살표 (목적지 방향)
   const last2 = points[points.length - 2];
   const last  = points[points.length - 1];
   const fdx = last.x - last2.x, fdz = last.z - last2.z;
   if (Math.hypot(fdx, fdz) > 0.01) {
-    const fdir = new THREE.Vector3(fdx, 0, fdz).normalize();
-    const forigin = new THREE.Vector3(last.x, 0.22, last.z);
-    pathGroup.add(new THREE.ArrowHelper(fdir, forigin, 2.2, 0xef4444, 1.2, 0.7));
+    addArrow(last.x, last.z, fdx, fdz);
   }
 
   scene.add(pathGroup);
@@ -557,12 +598,42 @@ function showPath(points) {
 
 function clearPath() {
   if (!pathGroup) return;
-  scene.remove(pathGroup);
+  // CSS2DObject의 DOM 요소를 직접 제거 — scene.remove만으로는 DOM에 남아 고정되는 버그 방지
   pathGroup.traverse(o => {
+    if (o.isCSS2DObject && o.element?.parentNode) {
+      o.element.parentNode.removeChild(o.element);
+    }
     if (o.geometry) o.geometry.dispose();
     if (o.material) o.material.dispose();
   });
+  scene.remove(pathGroup);
   pathGroup = null;
+  pathArrows.length = 0;
+  clearRoomHighlight();
+}
+
+// 헥톤입구(ENT-1) 강제 경유 구역 — A*로 경로를 찾더라도 반드시 ENT-1을 거침
+const HEKTON_FORCE_IDS = new Set(['M-12', 'M-11', 'M-10', 'P-1']);
+
+// ENT-1(헥톤입구) 경유 fallback 포함 경로 계산
+function getNavPath(fromX, fromZ, toX, toZ, toRoomId = null) {
+  const forceEnt1 = toRoomId && HEKTON_FORCE_IDS.has(toRoomId);
+  if (!forceEnt1) {
+    const direct = astarPath(fromX, fromZ, toX, toZ);
+    if (direct) return direct;
+  }
+  // 복도 없는 헥톤 구역: ENT-1까지 복도 경유 후 직선
+  const ent = ENTRANCES.find(e => e.id === 'ENT-1');
+  if (!ent) return null;
+  const toEnt = astarPath(fromX, fromZ, ent.x, ent.z);
+  if (!toEnt) return null;
+  const steps = Math.max(4, Math.ceil(Math.hypot(toX - ent.x, toZ - ent.z) / 2));
+  const tail = [];
+  for (let i = 0; i <= steps; i++) {
+    const t2 = i / steps;
+    tail.push(new THREE.Vector3(ent.x + (toX - ent.x) * t2, 0.13, ent.z + (toZ - ent.z) * t2));
+  }
+  return [...toEnt, ...tail.slice(1)];
 }
 
 function getSpawnPosition() {
@@ -639,55 +710,24 @@ function syncJoystickPos() {
 const compassRingEl = document.getElementById('compass-ring');
 let lastCompassTheta = null;
 
-function markPinDisconnected(id) {
+function removePinFromScene(id) {
   const pin = userPins.get(id);
-  if (!pin || disconnectedPins.has(id)) return;
-  disconnectedPins.add(id);
-
-  // 3D 핀 색상 → 회색으로
-  const gray = new THREE.Color(0x64748b);
-  const stem = pin.children[0];
-  const ball = pin.children[PIN_BALL_INDEX];
-  stem.material.color.set(gray);
-  stem.material.emissive.set(gray);
-  stem.material.emissiveIntensity = 0.05;
-  stem.material.transparent = true;
-  ball.material.color.set(gray);
-  ball.material.emissive.set(gray);
-  ball.material.emissiveIntensity = 0.05;
-  ball.material.transparent = true;
-
-  // 이름 라벨 → 끊김 스타일 + 아이콘
-  if (pin.userData.nameDiv) {
-    const nd = pin.userData.nameDiv;
-    nd.style.borderColor = '#475569';
-    nd.style.color = '#94a3b8';
-    nd.innerHTML = `<span class="dc-icon">📡</span>${nd.innerHTML}`;
-    nd.classList.add('label-disconnected');
-  }
-
-  // 30초 후 자동 제거
-  setTimeout(() => {
-    if (disconnectedPins.has(id)) {
-      scene.remove(userPins.get(id));
-      userPins.delete(id);
-      disconnectedPins.delete(id);
-      userLastChat.delete(id);
-      renderUserListFromCache();
-    }
-  }, 30000);
+  if (!pin) return;
+  scene.remove(pin);
+  userPins.delete(id);
+  disconnectedPins.delete(id);
 }
 
 // ── 유저 핀 동기화 ────────────────────────────────────────────
 function syncPins(users) {
   for (const [id] of userPins) {
-    if (!users.find(u => u.id === id)) {
-      markPinDisconnected(id);
-    }
+    const user = users.find(u => u.id === id);
+    // 완전 퇴장 또는 연결 끊김 → 핀 즉시 제거
+    if (!user || user.disconnected) removePinFromScene(id);
   }
   users.forEach(user => {
+    if (user.disconnected) return; // 오프라인 사용자는 핀 없음
     if (user.x === null || user.z === null) return;
-    if (disconnectedPins.has(user.id)) return; // 끊김 상태 핀은 건드리지 않음
 
     if (!userPins.has(user.id)) {
       const pin = makePin(user.color);
@@ -1148,6 +1188,8 @@ document.getElementById('floor-toggle-btn').addEventListener('click', () => {
 
 // ── 방 정보 패널 ─────────────────────────────────────────────
 function showRoomInfo(room) {
+  clearPath(); // 다른 방 선택 시 이전 경로 + 강조 해제
+  setRoomHighlight(room); // 선택된 방 3D 박스 강조
   const ti = ROOM_TYPES[room.type];
   const panel = document.getElementById('room-info-panel');
   panel.style.borderTopColor = ti.color;
@@ -1184,15 +1226,17 @@ function showRoomInfo(room) {
       btn.addEventListener('click', () => {
         const fromX = lounge.x + lounge.w / 2, fromZ = lounge.z + lounge.d / 2;
         const toX   = room.x   + room.w   / 2, toZ   = room.z   + room.d   / 2;
-        const path  = astarPath(fromX, fromZ, toX, toZ);
+        const path  = getNavPath(fromX, fromZ, toX, toZ, room.id);
         showPath(path);
-        // 경로가 잘 보이도록 중간 지점 위에서 내려다보기
-        const midX = (fromX + toX) / 2, midZ = (fromZ + toZ) / 2;
-        const dist = Math.hypot(toX - fromX, toZ - fromZ);
-        flyTo(midX, midZ, Math.max(50, dist * 0.9));
-        // 버튼 상태 토글
-        panel.querySelectorAll('.ri-nav-from').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
+        setRoomHighlight(room); // 목적지 회의실 강조
+        // 팝업 닫기
+        panel.hidden = true;
+        syncJoystickPos();
+        // 경로 전체가 한눈에 보이도록 디폴트 탑다운 뷰
+        state.flyTarget = {
+          pos:  new THREE.Vector3(FLOOR.CX, 150, FLOOR.CZ),
+          look: new THREE.Vector3(FLOOR.CX, 0, FLOOR.CZ),
+        };
       });
       riActions.appendChild(btn);
     });
@@ -1203,7 +1247,6 @@ function showRoomInfo(room) {
 }
 document.getElementById('room-info-close').onclick = () => {
   document.getElementById('room-info-panel').hidden = true;
-  clearPath();
   syncJoystickPos();
 };
 
@@ -1253,16 +1296,31 @@ document.getElementById('reset-camera-btn').addEventListener('click', () => {
   };
 });
 
-// 나침반 클릭 → 기본 방위각(theta=0)으로 복귀 (줌/기울기 유지)
-document.getElementById('compass')?.addEventListener('click', () => {
+// 나침반 방향 클릭 → 해당 방향이 화면 위쪽에 오도록 회전
+// theta 기준: 0=북↑, PI/2=서↑, PI=남↑, -PI/2=동↑
+function flyToAzimuth(targetTheta) {
   const offset = new THREE.Vector3().subVectors(camera.position, controls.target);
   const spherical = new THREE.Spherical().setFromVector3(offset);
-  spherical.theta = 0;
+  spherical.theta = targetTheta;
   offset.setFromSpherical(spherical);
   state.flyTarget = {
     pos:  new THREE.Vector3().addVectors(controls.target, offset),
     look: controls.target.clone(),
   };
+}
+
+// 나침반 클릭 — .cd는 pointer-events:none이므로 compass 전체에서 좌표로 방향 판별
+// 클릭한 시각적 위치를 화면 위쪽으로 오도록 회전: theta_new = theta_current - click_angle
+document.getElementById('compass')?.addEventListener('click', e => {
+  const rect   = e.currentTarget.getBoundingClientRect();
+  const dx     = e.clientX - (rect.left + rect.width  / 2);
+  const dy     = e.clientY - (rect.top  + rect.height / 2);
+  const radius = rect.width / 2;
+  // 중심 근처 클릭(20% 이내)은 무시 — 의도하지 않은 클릭 방지
+  if (Math.hypot(dx, dy) < radius * 0.2) return;
+  // 화면 위쪽(12시 방향)을 0으로 시계방향 각도(라디안)
+  const clickAngle = Math.atan2(dx, -dy);
+  flyToAzimuth(controls.getAzimuthalAngle() - clickAngle);
 });
 
 document.getElementById('locate-btn').addEventListener('click', () => {
@@ -1369,27 +1427,38 @@ function renderUserList(users) {
 }
 
 function renderUserListFromCache() {
-  const placed = _cachedUsers.filter(u => u.x !== null);
-  document.getElementById('user-count').textContent = placed.length;
-  document.getElementById('user-list').innerHTML = placed.map(u => {
+  const online     = _cachedUsers.filter(u => !u.disconnected && u.x !== null);
+  const offline    = _cachedUsers.filter(u => u.disconnected);
+  document.getElementById('user-count').textContent = online.length;
+
+  const onlineHtml = online.map(u => {
     const lastMsg = userLastChat.get(u.id) || '';
-    const chatHtml = lastMsg
-      ? `<span class="u-chat">💬 ${lastMsg}</span>`
-      : '';
+    const chatHtml = lastMsg ? `<span class="u-chat">💬 ${lastMsg}</span>` : '';
     return `<div class="user-item" onclick="flyToUser(${u.x}, ${u.z}, '${u.id}')">
       <span class="u-emoji-icon">${u.emoji || '🙂'}</span>
       <span class="u-dot" style="background:${u.color}"></span>
-      <div class="u-info">
-        <span class="u-name">${u.name}</span>
-        ${chatHtml}
-      </div>
+      <div class="u-info"><span class="u-name">${u.name}</span>${chatHtml}</div>
       <span class="u-go">→ 이동</span>
     </div>`;
-  }).join('') || '<div class="u-empty">아직 위치를 설정한 사람이 없어요</div>';
+  }).join('');
+
+  const offlineHtml = offline.map(u =>
+    `<div class="user-item user-item--offline">
+      <span class="u-emoji-icon">${u.emoji || '🙂'}</span>
+      <span class="u-dot" style="background:#475569"></span>
+      <div class="u-info">
+        <span class="u-name">${u.name}</span>
+        <span class="u-offline-tag">오프라인</span>
+      </div>
+    </div>`
+  ).join('');
+
+  const html = onlineHtml + offlineHtml || '<div class="u-empty">아직 위치를 설정한 사람이 없어요</div>';
+  document.getElementById('user-list').innerHTML = html;
   const mobUserList = document.getElementById('mob-user-list');
-  if (mobUserList) mobUserList.innerHTML = document.getElementById('user-list').innerHTML;
+  if (mobUserList) mobUserList.innerHTML = html;
   const mobUserCount = document.getElementById('mob-user-count');
-  if (mobUserCount) mobUserCount.textContent = placed.length;
+  if (mobUserCount) mobUserCount.textContent = online.length;
 }
 window.flyToUser = (x, z, userId) => {
   flyTo(x, z, 18);
@@ -1540,15 +1609,13 @@ function initMobileControls() {
   camPad.addEventListener('touchstart', e => {
     const now = Date.now();
     if (now - camLastTap < 300) {
-      // 더블탭 — 회전(theta)만 0으로 초기화, 줌/위치 유지
+      // 더블탭 — 현재 위치 그대로, 탑다운 뷰로만 전환
       e.preventDefault();
-      const offset = new THREE.Vector3().subVectors(camera.position, controls.target);
-      const spherical = new THREE.Spherical().setFromVector3(offset);
-      spherical.theta = 0;
-      offset.setFromSpherical(spherical);
+      const dist = camera.position.distanceTo(controls.target);
+      const look = controls.target.clone();
       state.flyTarget = {
-        pos:  new THREE.Vector3().addVectors(controls.target, offset),
-        look: controls.target.clone(),
+        pos:  new THREE.Vector3(look.x, dist, look.z),
+        look,
       };
       camLastTap = 0;
       return;
@@ -1639,23 +1706,13 @@ function animate() {
   }
 
   userPins.forEach((pin, id) => {
-    if (disconnectedPins.has(id)) {
-      // 끊김 핀: 느린 깜빡임
-      const opacity = 0.2 + 0.3 * Math.abs(Math.sin(t * 0.9));
-      pin.children[0].material.opacity = opacity;
-      pin.children[PIN_BALL_INDEX].material.opacity = opacity;
-      pin.children[PIN_BALL_INDEX].scale.setScalar(0.85);
-    } else {
-      const isMe = id === state.myId;
-      // 내 핀: 더 크고 빠른 펄스
-      pin.children[PIN_BALL_INDEX].scale.setScalar(
-        isMe ? 1 + 0.18 * Math.sin(t * 4) : 1 + 0.1 * Math.sin(t * 3)
-      );
-      // 내 핀 바닥 링 펄싱
-      if (isMe && pin.userData.meRing) {
-        pin.userData.meRing.material.opacity = 0.3 + 0.4 * Math.abs(Math.sin(t * 2));
-        pin.userData.meRing.scale.setScalar(1 + 0.12 * Math.sin(t * 2));
-      }
+    const isMe = id === state.myId;
+    pin.children[PIN_BALL_INDEX].scale.setScalar(
+      isMe ? 1 + 0.18 * Math.sin(t * 4) : 1 + 0.1 * Math.sin(t * 3)
+    );
+    if (isMe && pin.userData.meRing) {
+      pin.userData.meRing.material.opacity = 0.3 + 0.4 * Math.abs(Math.sin(t * 2));
+      pin.userData.meRing.scale.setScalar(1 + 0.12 * Math.sin(t * 2));
     }
   });
 
@@ -1666,13 +1723,32 @@ function animate() {
   }
 
   // 나침반 회전 업데이트 (방위각에 따라 나침반 링 회전)
+  const theta = controls.getAzimuthalAngle();
   if (compassRingEl) {
-    const theta = controls.getAzimuthalAngle();
     if (lastCompassTheta === null || Math.abs(theta - lastCompassTheta) > 0.003) {
       compassRingEl.style.transform = `rotate(${(theta * 180 / Math.PI).toFixed(1)}deg)`;
       lastCompassTheta = theta;
     }
   }
+
+  // 경로 화살표 방향: project(camera)로 3D 경로를 화면 2D로 투영해 CSS rotate 계산
+  if (pathArrows.length > 0) {
+    const _p1 = new THREE.Vector3(), _p2 = new THREE.Vector3();
+    pathArrows.forEach(({ inner, from, to }) => {
+      _p1.copy(from).project(camera); // NDC: x right, y up
+      _p2.copy(to).project(camera);
+      const sx = _p2.x - _p1.x;
+      const sy = _p2.y - _p1.y; // NDC y 양수 = 화면 위쪽
+      const cssAngle = Math.atan2(sx, sy) * 180 / Math.PI;
+      inner.style.transform = `rotate(${cssAngle.toFixed(1)}deg)`;
+    });
+  }
+
+  // 선택/목적지 회의실 강조 펄스
+  if (highlightMesh) {
+    highlightMesh.material.emissiveIntensity = 0.45 + 0.75 * Math.abs(Math.sin(t * 2.8));
+  }
+
 
   controls.update();
   renderer.render(scene, camera);
