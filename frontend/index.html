@@ -106,13 +106,19 @@
       <div id="chat-log" class="chat-log"></div>
 
       <!-- 나침반 -->
-      <div id="compass" class="compass" title="클릭: 방향 초기화">
+      <div id="compass" class="compass" title="클릭: 정북 방향으로 초기화">
         <div class="compass-ring" id="compass-ring">
           <div class="cd cd-e">동<span>한양대역</span></div>
           <div class="cd cd-w">서<span>행당공원</span></div>
           <div class="cd cd-n">북<span>중랑천</span></div>
           <div class="cd cd-s">남<span>왕십리역</span></div>
         </div>
+      </div>
+
+      <!-- PC 전용: 나침반 하단 액션 버튼 -->
+      <div class="compass-btn-group" id="compass-btn-group">
+        <button class="compass-action-btn" onclick="resetCameraRotation()" title="화면 방향을 정북으로 초기화">🔄 방향 초기화</button>
+        <button class="compass-action-btn" onclick="flyToMyPin()" title="내 핀 위치로 이동">📍 내 위치로</button>
       </div>
 
       <!-- 위치 지정 힌트 -->
