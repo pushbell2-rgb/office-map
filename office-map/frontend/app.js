@@ -856,12 +856,13 @@ socket.on('chat-message', ({ id, message, color }) => {
 function checkOnboarding() {
   if (!localStorage.getItem('lf-onboarded')) {
     document.getElementById('onboard-overlay').hidden = false;
-    document.getElementById('onboard-close').addEventListener('click', () => {
-      document.getElementById('onboard-overlay').hidden = true;
-      localStorage.setItem('lf-onboarded', '1');
-    });
   }
 }
+// ?키 재오픈 포함 항상 동작하도록 리스너 분리
+document.getElementById('onboard-close').addEventListener('click', () => {
+  document.getElementById('onboard-overlay').hidden = true;
+  localStorage.setItem('lf-onboarded', '1');
+});
 
 socket.on('joined', ({ color }) => {
   state.myColor = color;
