@@ -1332,7 +1332,19 @@ function flyToAzimuth(targetTheta) {
   };
 }
 
-// 나침반은 현재 방위각 표시 전용 — 클릭 기능 없음
+// 나침반 클릭 → 정북(디폴트) 방향으로 초기화
+document.getElementById('compass')?.addEventListener('click', () => {
+  flyToAzimuth(0);
+});
+
+// 화면 방향 초기화 (PC 버튼)
+window.resetCameraRotation = () => { flyToAzimuth(0); };
+
+// 내 핀 위치로 이동 (PC 버튼)
+window.flyToMyPin = () => {
+  const pin = userPins.get(state.myId);
+  if (pin) flyTo(pin.position.x, pin.position.z, 22);
+};
 
 document.getElementById('locate-btn').addEventListener('click', () => {
   state.pickingMode ? exitPickMode() : enterPickMode();
