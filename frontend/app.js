@@ -795,7 +795,9 @@ function showChatBubble(id, message, color) {
   }
 
   const bubbleDiv = pin.userData.bubbleDiv;
-  bubbleDiv.textContent = message;
+  const sender = _cachedUsers.find(u => u.id === id);
+  const senderEmoji = sender?.emoji || '';
+  bubbleDiv.textContent = senderEmoji ? `${senderEmoji} ${message}` : message;
   bubbleDiv.style.borderColor = color;
 
   // 애니메이션 강제 재실행 (기존 메시지 위에 새 메시지가 올 때도 동작)
@@ -1113,9 +1115,7 @@ window.addEventListener('keydown', e => {
   if (!isTyping && (e.key === 't' || e.key === 'T')) {
     if (!state.joined) return;
     e.preventDefault();
-    document.getElementById('chat-bar').hidden = false;
-    syncJoystickPos();
-    document.getElementById('chat-input').focus();
+    openChatBar();
     return;
   }
 
@@ -1506,6 +1506,8 @@ document.getElementById('legend').innerHTML = Object.entries(ROOM_TYPES).map(([t
 // ── 프로필 편집 ───────────────────────────────────────────────
 function updateProfileBtn() {
   document.getElementById('profile-btn').textContent = `${state.myEmoji} ${state.myName}`;
+  const mobIcon = document.getElementById('mob-profile-icon');
+  if (mobIcon) mobIcon.textContent = state.myEmoji;
 }
 
 function renderEmojiGrid(gridId) {
@@ -1566,11 +1568,18 @@ window.closeSheet = () => {
   const mc = document.querySelector('.mobile-controls');
   if (mc) mc.style.display = '';
 };
-window.openMobChat = () => {
-  if (!state.joined) return;
+function openChatBar() {
+  // 채팅바 레이블을 내 이모지로 갱신 후 표시
+  const label = document.querySelector('.chat-label');
+  if (label) label.textContent = state.myEmoji || '💬';
   document.getElementById('chat-bar').hidden = false;
   syncJoystickPos();
   document.getElementById('chat-input').focus();
+}
+
+window.openMobChat = () => {
+  if (!state.joined) return;
+  openChatBar();
 };
 
 // ── 모바일 조이스틱 ───────────────────────────────────────────
