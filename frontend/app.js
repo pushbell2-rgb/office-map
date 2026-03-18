@@ -1331,19 +1331,7 @@ function flyToAzimuth(targetTheta) {
   };
 }
 
-// 나침반 클릭 — .cd는 pointer-events:none이므로 compass 전체에서 좌표로 방향 판별
-// 클릭한 시각적 위치를 화면 위쪽으로 오도록 회전: theta_new = theta_current - click_angle
-document.getElementById('compass')?.addEventListener('click', e => {
-  const rect   = e.currentTarget.getBoundingClientRect();
-  const dx     = e.clientX - (rect.left + rect.width  / 2);
-  const dy     = e.clientY - (rect.top  + rect.height / 2);
-  const radius = rect.width / 2;
-  // 중심 근처 클릭(20% 이내)은 무시 — 의도하지 않은 클릭 방지
-  if (Math.hypot(dx, dy) < radius * 0.2) return;
-  // 화면 위쪽(12시 방향)을 0으로 시계방향 각도(라디안)
-  const clickAngle = Math.atan2(dx, -dy);
-  flyToAzimuth(controls.getAzimuthalAngle() - clickAngle);
-});
+// 나침반은 현재 방위각 표시 전용 — 클릭 기능 없음
 
 document.getElementById('locate-btn').addEventListener('click', () => {
   state.pickingMode ? exitPickMode() : enterPickMode();
@@ -1398,7 +1386,6 @@ function renderRoomList(query = '') {
           <span class="ri-id-sm">${hl(r.id)}</span>
           <span class="ri-name-sm">${hl(r.name)}</span>
           <div class="ri-item-actions">
-            <button class="btn-go-room" onclick="event.stopPropagation();navigateToRoom('${r.id}')">이동</button>
             <button class="btn-link-room" onclick="copyRoomLink(event,'${r.id}')" title="링크 복사">🔗</button>
           </div>
         </div>`;
