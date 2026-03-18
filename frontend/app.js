@@ -4,7 +4,7 @@ import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer
 import { ROOMS, ROOM_TYPES, ENTRANCES, CORRIDORS, WALLS, DESKS, FACILITIES } from './map-data.js';
 
 // ── 상수 ─────────────────────────────────────────────────────
-const FLOOR = { W: 140, D: 88, CX: 70, CZ: 44 };
+const FLOOR = { W: 158, D: 100, CX: 79, CZ: 50 };
 const SPAWN = { cx: 111, cz: 50, r: 8 }; // 입구 1·2 하단 스폰 원
 const PIN_BALL_INDEX = 1;
 const ARROW_STEP = 2.0;
@@ -203,9 +203,10 @@ function initEntrances() {
 
   ENTRANCES.forEach(entry => {
     const isElevator = entry.type === 'elevator';
-    // 형광색: 입구=네온 그린, 엘리베이터=네온 옐로
-    const color    = isElevator ? 0xffee00 : 0x39ff14;
-    const colorStr = isElevator ? '#ffee00' : '#39ff14';
+    const isExit     = entry.type === 'exit';
+    // 형광색: 입구=네온 그린, 엘리베이터=네온 옐로, 비상구=네온 레드
+    const color    = isElevator ? 0xffee00 : isExit ? 0xff3333 : 0x39ff14;
+    const colorStr = isElevator ? '#ffee00' : isExit ? '#ff3333' : '#39ff14';
 
     const g = new THREE.Group();
     g.position.set(entry.x, 0, entry.z);
@@ -220,14 +221,23 @@ function initEntrances() {
     glow.position.y = 0.04;
     g.add(glow);
 
-    // ── Sprite 형광 동그라미 라벨 (Three.js 원근에 따라 줌 비례 크기 변화) ──
-    const labelText = entry.callout || entry.name;
-    const sprite = new THREE.Sprite(
-      new THREE.SpriteMaterial({ map: makeCircleLabel(labelText, colorStr), transparent: true, depthWrite: false })
-    );
-    sprite.scale.set(5, 5, 1); // world units — 줌에 비례해 자연스럽게 변화
-    sprite.position.set(0, 2.5, 0);
-    g.add(sprite);
+    // ── 라벨: 비상구는 이모지 아이콘만, 나머지는 형광 동그라미 스프라이트 ──
+    if (isExit) {
+      const wrap = document.createElement('div');
+      wrap.style.cssText = 'font-size:24px;line-height:1;pointer-events:none;user-select:none;';
+      wrap.textContent = '🚨';
+      const icon2d = new CSS2DObject(wrap);
+      icon2d.position.set(0, 2.5, 0);
+      g.add(icon2d);
+    } else {
+      const labelText = entry.callout || entry.name;
+      const sprite = new THREE.Sprite(
+        new THREE.SpriteMaterial({ map: makeCircleLabel(labelText, colorStr), transparent: true, depthWrite: false })
+      );
+      sprite.scale.set(5, 5, 1);
+      sprite.position.set(0, 2.5, 0);
+      g.add(sprite);
+    }
 
     // ── 방향 화살표 (동그라미 테두리에 화살촉 끝이 닿음) ──────
     if (entry.direction) {
@@ -235,6 +245,9 @@ function initEntrances() {
       if (entry.direction === 'z-') {
         dir    = new THREE.Vector3(0, 0, -1);
         origin = new THREE.Vector3(0, ARROW_Y, ARROW_ORIGIN_D);
+      } else if (entry.direction === 'z+') {
+        dir    = new THREE.Vector3(0, 0, 1);
+        origin = new THREE.Vector3(0, ARROW_Y, -ARROW_ORIGIN_D);
       } else {
         dir    = new THREE.Vector3(-1, 0, 0);
         origin = new THREE.Vector3(ARROW_ORIGIN_D, ARROW_Y, 0);
@@ -247,8 +260,8 @@ function initEntrances() {
         new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.55, transparent: true, opacity: 0.92 })
       );
       shaft.position.copy(shaftCenter);
-      if (entry.direction === 'z-') shaft.rotation.x =  Math.PI / 2;
-      else                          shaft.rotation.z = -Math.PI / 2;
+      if (entry.direction === 'z-' || entry.direction === 'z+') shaft.rotation.x = Math.PI / 2;
+      else                                                       shaft.rotation.z = -Math.PI / 2;
       g.add(shaft);
 
       // 화살촉 (끝점 = 동그라미 테두리)
@@ -258,8 +271,9 @@ function initEntrances() {
         new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.7, transparent: true, opacity: 0.98 })
       );
       head.position.copy(headCenter);
-      if (entry.direction === 'z-') head.rotation.x = -Math.PI / 2;
-      else                          head.rotation.z =  Math.PI / 2;
+      if      (entry.direction === 'z-') head.rotation.x = -Math.PI / 2;
+      else if (entry.direction === 'z+') head.rotation.x =  Math.PI / 2;
+      else                               head.rotation.z =  Math.PI / 2;
       g.add(head);
 
       // 슬라이딩 쉐브론 (화살표 꼬리 → 동그라미 테두리까지)
@@ -270,8 +284,9 @@ function initEntrances() {
           new THREE.ConeGeometry(0.58, 0.85, 8),
           new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0, depthWrite: false })
         );
-        if (entry.direction === 'z-') chev.rotation.x = -Math.PI / 2;
-        else                          chev.rotation.z =  Math.PI / 2;
+        if      (entry.direction === 'z-') chev.rotation.x = -Math.PI / 2;
+        else if (entry.direction === 'z+') chev.rotation.x =  Math.PI / 2;
+        else                               chev.rotation.z =  Math.PI / 2;
         chev.position.copy(origin);
         g.add(chev);
         chevrons.push(chev);

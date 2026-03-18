@@ -662,11 +662,11 @@ body { font-family: -apple-system, 'Noto Sans KR', sans-serif; background: var(-
 .onboard-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
 
 .copy-toast {
-  position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+  position: fixed; bottom: 70px; left: 50%; transform: translateX(-50%);
   background: #10b981; color: #fff;
   font-size: 13px; font-weight: 700;
   padding: 10px 24px; border-radius: 24px;
-  z-index: 600; pointer-events: none;
+  z-index: 1300; pointer-events: none;
   box-shadow: var(--shadow);
   animation: toast-in .25s ease;
 }
