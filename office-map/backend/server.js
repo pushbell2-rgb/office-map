@@ -98,22 +98,16 @@ io.on('connection', (socket) => {
       user.disconnected = true;
       user.disconnectedAt = Date.now();
       broadcast();
+      // 30초 유예 후 제거 (짧은 네트워크 단절 대응)
+      setTimeout(() => {
+        if (users.get(socket.id)?.disconnected) {
+          users.delete(socket.id);
+          broadcast();
+        }
+      }, 30 * 1000);
     }
   });
 });
-
-// 24시간마다 끊긴 사용자 정리
-setInterval(() => {
-  const cutoff = Date.now() - 24 * 60 * 60 * 1000;
-  let changed = false;
-  for (const [id, user] of users) {
-    if (user.disconnected && user.disconnectedAt < cutoff) {
-      users.delete(id);
-      changed = true;
-    }
-  }
-  if (changed) broadcast();
-}, 60 * 60 * 1000);
 
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
