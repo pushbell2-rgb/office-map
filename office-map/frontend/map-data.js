@@ -146,7 +146,7 @@ export const FACILITIES = [
   { id: 'PB-4', name: '폰부스', type: 'phonebooth', x: 44.5, z: 13.5 },
   // 냉장고 — 라운지1 오른쪽벽(x=91.32) + 아래살짝위 / 아래벽(z=62.84) + 왼쪽끝에서살짝우측
   { id: 'FR-1', name: '병원사업본부\n냉장고',              type: 'fridge', x: 90.3, z: 60.3 },
-  { id: 'FR-2', name: 'IT개발본부/PI본부\n냉장고',         type: 'fridge', x: 75.8, z: 61.8 },
+  { id: 'FR-2', name: 'IT개발본부/PI본부\n냉장고',         type: 'fridge', x: 83.5, z: 61.8 },
   // 냉장고 — 라운지2 아래벽(z=51.44), 두 대 나란히
   { id: 'FR-3', name: '(L)약국사업본부/\n제약사업본부 냉장고', type: 'fridge', x: 38.5, z: 50.3 },
   { id: 'FR-4', name: '(R)SO본부\n냉장고',                type: 'fridge', x: 31.5, z: 50.3 },

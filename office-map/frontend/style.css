@@ -182,6 +182,37 @@ body { font-family: -apple-system, 'Noto Sans KR', sans-serif; background: var(-
 }
 
 /* 방 정보 패널 */
+.fridge-popup {
+  position: absolute; bottom: 60px; right: 16px;
+  background: var(--glass);
+  border: 1px solid var(--border);
+  border-top: 3px solid #06b6d4;
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  width: 300px; max-height: 72vh;
+  backdrop-filter: blur(12px);
+  box-shadow: var(--shadow);
+  z-index: 300;
+  overflow: hidden; display: flex; flex-direction: column;
+}
+.fridge-popup[hidden] { display: none; }
+.fp-close {
+  position: absolute; top: 8px; right: 10px;
+  background: none; border: none; color: var(--text-muted);
+  cursor: pointer; font-size: 13px; padding: 2px 6px;
+}
+.fp-close:hover { color: var(--text); }
+.fp-title { font-size: 16px; font-weight: 800; color: #a5f3fc; margin-bottom: 10px; padding-right: 20px; }
+.fp-body { overflow-y: auto; font-size: 12px; line-height: 1.6; color: var(--text-muted); }
+.fp-clean-day { font-weight: 700; color: #fde68a; margin-bottom: 6px; }
+.fp-intro { margin-bottom: 10px; }
+.fp-section-title { font-weight: 700; color: var(--text); margin-bottom: 6px; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
+.fp-rule { margin-bottom: 8px; }
+.fp-rule strong { color: var(--text); }
+.fp-rule ul { margin: 4px 0 0 14px; padding: 0; }
+.fp-rule li { margin-bottom: 2px; }
+.fp-warning { margin-top: 10px; padding: 8px 10px; background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.3); border-radius: 6px; color: #fca5a5; font-size: 11px; line-height: 1.5; }
+
 .room-info-panel {
   position: absolute; bottom: 60px; left: 16px;
   background: var(--glass);

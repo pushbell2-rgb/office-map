@@ -443,6 +443,10 @@ function initFacilities() {
     const labelObj = new CSS2DObject(div);
     labelObj.position.set(0, isFridge ? 3.0 : 2.0, 0);
     g.add(labelObj);
+    if (isFridge) {
+      marker.userData.fridge = fac;
+      fridgeMeshes.push(marker);
+    }
   });
 }
 
@@ -679,6 +683,7 @@ const floor = initFloor();
 initCorridors();
 initWalls();
 initDesks();
+const fridgeMeshes = [];
 initFacilities();
 const roomMeshes = initRooms();
 const entranceAnimData = initEntrances();
@@ -1055,7 +1060,10 @@ renderer.domElement.addEventListener('mousemove', (e) => {
     state.hoveredMesh = hits[0].object;
     state.hoveredMesh.material.emissiveIntensity = 0.4;
     renderer.domElement.style.cursor = 'pointer';
+    return;
   }
+  const fridgeHits = raycaster.intersectObjects(fridgeMeshes);
+  if (fridgeHits.length > 0) renderer.domElement.style.cursor = 'pointer';
 });
 
 renderer.domElement.addEventListener('click', (e) => {
@@ -1067,6 +1075,12 @@ renderer.domElement.addEventListener('click', (e) => {
   const roomHits = raycaster.intersectObjects(roomMeshes);
   if (roomHits.length > 0) {
     showRoomInfo(roomHits[0].object.userData.room);
+    return;
+  }
+
+  const fridgeHits = raycaster.intersectObjects(fridgeMeshes);
+  if (fridgeHits.length > 0) {
+    showFridgePopup(fridgeHits[0].object.userData.fridge);
     return;
   }
 
@@ -1096,6 +1110,13 @@ renderer.domElement.addEventListener('touchend', (e) => {
   const roomHits = raycaster.intersectObjects(roomMeshes);
   if (roomHits.length > 0) {
     showRoomInfo(roomHits[0].object.userData.room);
+    return;
+  }
+
+  // 냉장고 터치 → 팝업
+  const fridgeTouchHits = raycaster.intersectObjects(fridgeMeshes);
+  if (fridgeTouchHits.length > 0) {
+    showFridgePopup(fridgeTouchHits[0].object.userData.fridge);
     return;
   }
 
@@ -1207,6 +1228,16 @@ document.getElementById('chat-input').addEventListener('blur', () => {
 document.getElementById('floor-toggle-btn').addEventListener('click', () => {
   floor.visible = !floor.visible;
   document.getElementById('floor-toggle-btn').textContent = floor.visible ? '🗺 도면 숨기기' : '🗺 도면 보기';
+});
+
+// ── 냉장고 팝업 ──────────────────────────────────────────────
+function showFridgePopup(fac) {
+  const popup = document.getElementById('fridge-popup');
+  document.getElementById('fp-name').textContent = fac.name.replace('\n', ' ');
+  popup.hidden = false;
+}
+document.getElementById('fridge-popup-close').addEventListener('click', () => {
+  document.getElementById('fridge-popup').hidden = true;
 });
 
 // ── 방 정보 패널 ─────────────────────────────────────────────
