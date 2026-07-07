@@ -1072,15 +1072,15 @@ renderer.domElement.addEventListener('click', (e) => {
   mouse.set(x, y);
   raycaster.setFromCamera(mouse, camera);
 
-  const roomHits = raycaster.intersectObjects(roomMeshes);
-  if (roomHits.length > 0) {
-    showRoomInfo(roomHits[0].object.userData.room);
-    return;
-  }
-
   const fridgeHits = raycaster.intersectObjects(fridgeMeshes);
   if (fridgeHits.length > 0) {
     showFridgePopup(fridgeHits[0].object.userData.fridge);
+    return;
+  }
+
+  const roomHits = raycaster.intersectObjects(roomMeshes);
+  if (roomHits.length > 0) {
+    showRoomInfo(roomHits[0].object.userData.room);
     return;
   }
 
@@ -1106,17 +1106,17 @@ renderer.domElement.addEventListener('touchend', (e) => {
   mouse.set(tx, ty);
   raycaster.setFromCamera(mouse, camera);
 
+  // 냉장고 터치 → 팝업 (방보다 우선)
+  const fridgeTouchHits = raycaster.intersectObjects(fridgeMeshes);
+  if (fridgeTouchHits.length > 0) {
+    showFridgePopup(fridgeTouchHits[0].object.userData.fridge);
+    return;
+  }
+
   // 방 터치 → 정보 패널
   const roomHits = raycaster.intersectObjects(roomMeshes);
   if (roomHits.length > 0) {
     showRoomInfo(roomHits[0].object.userData.room);
-    return;
-  }
-
-  // 냉장고 터치 → 팝업
-  const fridgeTouchHits = raycaster.intersectObjects(fridgeMeshes);
-  if (fridgeTouchHits.length > 0) {
-    showFridgePopup(fridgeTouchHits[0].object.userData.fridge);
     return;
   }
 
@@ -1230,14 +1230,29 @@ document.getElementById('floor-toggle-btn').addEventListener('click', () => {
   document.getElementById('floor-toggle-btn').textContent = floor.visible ? '🗺 도면 숨기기' : '🗺 도면 보기';
 });
 
+// ── 좌측 패널 스택 (room-info-panel + fridge-popup 겹침 방지) ──
+function repositionLeftPanels() {
+  const roomPanel = document.getElementById('room-info-panel');
+  const fridgePopup = document.getElementById('fridge-popup');
+  const BASE = 60;
+  const GAP = 8;
+  roomPanel.style.bottom = BASE + 'px';
+  fridgePopup.style.bottom = BASE + 'px';
+  if (!roomPanel.hidden && !fridgePopup.hidden) {
+    fridgePopup.style.bottom = (BASE + roomPanel.offsetHeight + GAP) + 'px';
+  }
+}
+
 // ── 냉장고 팝업 ──────────────────────────────────────────────
 function showFridgePopup(fac) {
   const popup = document.getElementById('fridge-popup');
   document.getElementById('fp-name').textContent = fac.name.replace('\n', ' ');
   popup.hidden = false;
+  repositionLeftPanels();
 }
 document.getElementById('fridge-popup-close').addEventListener('click', () => {
   document.getElementById('fridge-popup').hidden = true;
+  repositionLeftPanels();
 });
 
 // ── 방 정보 패널 ─────────────────────────────────────────────
@@ -1319,10 +1334,12 @@ function showRoomInfo(room) {
   }
 
   panel.hidden = false;
+  repositionLeftPanels();
   syncJoystickPos();
 }
 document.getElementById('room-info-close').onclick = () => {
   document.getElementById('room-info-panel').hidden = true;
+  repositionLeftPanels();
   syncJoystickPos();
 };
 
