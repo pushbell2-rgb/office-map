@@ -2,13 +2,32 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
+const fs = require('fs');
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
+const POSITIONS_FILE = path.join(__dirname, 'positions.json');
+let savedPositions = {};
+try {
+  const raw = fs.readFileSync(POSITIONS_FILE, 'utf8');
+  savedPositions = JSON.parse(raw || '{}');
+  console.log('[위치] 저장된 위치 로드:', Object.keys(savedPositions).length, '명');
+} catch (e) {
+  savedPositions = {};
+}
+
+function savePositions() {
+  fs.writeFile(POSITIONS_FILE, JSON.stringify(savedPositions, null, 2), () => {});
+}
+
 app.use(express.static(path.join(__dirname, '../frontend')));
 app.use('/public', express.static(path.join(__dirname, '../public')));
+
+app.get('/api/positions', (req, res) => {
+  res.json(savedPositions);
+});
 
 const users = new Map();
 const PIN_COLORS = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
@@ -25,20 +44,30 @@ io.on('connection', (socket) => {
   socket.emit('users-update', Array.from(users.values()));
 
   socket.on('join', ({ name, emoji }) => {
+    const userName = name || '익명';
     users.set(socket.id, {
       id: socket.id,
-      name: name || '익명',
+      name: userName,
       emoji: emoji || '🙂',
       x: null, z: null,
       color,
     });
     socket.emit('joined', { color });
+    socket.emit('desks-update', savedPositions);
     broadcast();
   });
 
   socket.on('set-location', ({ x, z }) => {
     const user = users.get(socket.id);
     if (user) { user.x = x; user.z = z; broadcast(); }
+  });
+
+  socket.on('set-desk', ({ x, z }) => {
+    const user = users.get(socket.id);
+    if (!user) return;
+    savedPositions[user.name] = { x, z, emoji: user.emoji };
+    savePositions();
+    io.emit('desks-update', savedPositions);
   });
 
   socket.on('update-profile', ({ name, emoji }) => {

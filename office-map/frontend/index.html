@@ -93,12 +93,20 @@
     <div class="canvas-wrap">
       <div id="canvas-container"></div>
 
+      <!-- 층 스위처 -->
+      <div class="floor-switcher">
+        <button class="floor-btn" data-floor="1F" onclick="setActiveFloor('1F')">1층</button>
+        <button class="floor-btn" data-floor="GF" onclick="setActiveFloor('GF')">GF층</button>
+        <button class="floor-btn floor-btn--active" data-floor="LF" onclick="setActiveFloor('LF')">LF층</button>
+      </div>
+
       <!-- 상단 바 -->
       <div class="top-bar">
         <span class="top-title">서울숲 LF층.</span>
         <button id="floor-toggle-btn" class="btn-topbar">🗺 도면 보기</button>
         <button id="reset-camera-btn" class="btn-topbar">👁 탑다운</button>
         <button id="locate-btn" class="btn-locate">📍 내 위치 설정</button>
+        <button id="desk-btn" class="btn-locate btn-desk">🪑 내 자리 등록</button>
         <button id="profile-btn" class="btn-topbar btn-profile">🙂 나</button>
       </div>
 

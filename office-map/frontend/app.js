@@ -5,6 +5,12 @@ import { ROOMS, ROOM_TYPES, ENTRANCES, CORRIDORS, WALLS, DESKS, FACILITIES } fro
 
 // ── 상수 ─────────────────────────────────────────────────────
 const FLOOR = { W: 158, D: 100, CX: 79, CZ: 50 };
+const FLOOR_GAP = 10; // 층간 높이 간격 (3D units)
+const FLOOR_DEFS = [
+  { id: 'LF', label: 'LF층', yBase: 0 },
+  { id: 'GF', label: 'GF층', yBase: FLOOR_GAP },
+  { id: '1F', label: '1층',  yBase: FLOOR_GAP * 2 },
+];
 const SPAWN = { cx: 111, cz: 50, r: 8 }; // 입구 1·2 하단 스폰 원
 const PIN_BALL_INDEX = 1;
 const ARROW_STEP = 2.0;
@@ -25,6 +31,7 @@ const state = {
   activeFilter: null,      // 타입별 필터 (null = 전체)
   floorWasVisible: false,
   lastPos: null,           // 마지막 위치 (재연결 시 복구용)
+  activeFloor: 'LF',
 };
 
 // ── URL 파라미터 ──────────────────────────────────────────────
@@ -55,7 +62,7 @@ const controls = new OrbitControls(camera, renderer.domElement);
 controls.target.set(FLOOR.CX, 0, FLOOR.CZ);
 controls.maxPolarAngle = Math.PI / 2 - 0.02;
 controls.minDistance = 10;
-controls.maxDistance = 160;
+controls.maxDistance = 240;
 controls.enableDamping = true;
 controls.dampingFactor = 0.08;
 controls.touches = { ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_PAN };
@@ -680,6 +687,14 @@ function getSpawnPosition() {
 // ── 씬 구성 실행 ─────────────────────────────────────────────
 initLights();
 const floor = initFloor();
+// 투명 raycasting 전용 plane — 항상 visible=true, 화면에 보이지 않음
+const pickPlane = new THREE.Mesh(
+  new THREE.PlaneGeometry(FLOOR.W, FLOOR.D),
+  new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false })
+);
+pickPlane.rotation.x = -Math.PI / 2;
+pickPlane.position.set(FLOOR.CX, 0.01, FLOOR.CZ);
+scene.add(pickPlane);
 initCorridors();
 initWalls();
 initDesks();
@@ -689,6 +704,276 @@ const roomMeshes = initRooms();
 const entranceAnimData = initEntrances();
 const spawnRing = initSpawnZone();
 const userPins = new Map();
+const personalDeskMeshes = new Map(); // name → { group, mesh, labelObj }
+
+// 자리 미리보기 ghost mesh
+const DESK_GEO = new THREE.BoxGeometry(2.2, 0.3, 1.6);
+const deskGhost = new THREE.Mesh(
+  DESK_GEO,
+  new THREE.MeshStandardMaterial({ color: 0xfde68a, transparent: true, opacity: 0.45, depthWrite: false })
+);
+const deskGhostEdge = new THREE.LineSegments(
+  new THREE.EdgesGeometry(DESK_GEO),
+  new THREE.LineBasicMaterial({ color: 0xf59e0b, transparent: true, opacity: 0.8 })
+);
+deskGhost.position.y = 0.15;
+deskGhostEdge.position.y = 0.15;
+deskGhost.userData.floorId = 'LF';
+deskGhostEdge.userData.floorId = 'LF';
+deskGhost.visible = false;
+deskGhostEdge.visible = false;
+scene.add(deskGhost);
+scene.add(deskGhostEdge);
+
+// ── 다층 구조 ─────────────────────────────────────────────────
+// LF 오브젝트 전체 태깅 (Grid 제외)
+scene.traverse(obj => {
+  if (obj.userData.floorId !== undefined) return;
+  if (obj.type === 'GridHelper') { obj.userData.floorId = 'global'; return; }
+  if (obj.isMesh || obj.isLine || obj.isLineSegments || obj instanceof CSS2DObject) {
+    obj.userData.floorId = 'LF';
+  }
+});
+
+// GF 플레이스홀더 방 배치 (도면 없음 — 대략적 구획)
+// GF 전용 바닥 크기 (LF보다 넓게, 에스컬레이터 기준 좌우로 확장)
+const GF_FLOOR = { W: 260, D: 110, CX: 130, CZ: 55 };
+
+// GF 룸 배치 (에스컬레이터 기준: x=121, z=39)
+// 에스컬레이터 왼쪽 위: 카페 / 오른쪽 위: 약국 → emart24 → 구내식당
+const GF_PLACEHOLDER = [
+  { name: '카페',       color: 0xf97316, x:  60, z:  5, w: 50, d: 30 }, // 에스컬레이터 왼쪽 위
+  { name: '서울숲약국', color: 0x10b981, x: 128, z:  5, w: 28, d: 28 }, // 에스컬레이터 오른쪽 위
+  { name: 'emart24',   color: 0x3b82f6, x: 158, z:  5, w: 25, d: 28 }, // 약국 오른쪽
+  { name: '구내식당',   color: 0xf59e0b, x: 185, z:  5, w: 55, d: 55 }, // emart24 오른쪽, 대형
+  // 복도: 약국~emart24~구내식당 아래를 가로로 연결
+  { name: null,         color: 0x94a3b8, x: 128, z: 33, w: 112, d:  7 },
+];
+// 1F: 왼쪽으로 확장 — 타워1(엘리베이터 포함) + 타워2 영역 명확히 분리
+// 바닥: x=-80 ~ 158 (W=238), CX=39, CZ=50
+const F1_FLOOR  = { W: 258, D: 100, CX: 39, CZ: 50 };
+const T1_END_X  = 20;  // 타워1 오른쪽 끝 (엘리베이터 x=13.85 바로 오른쪽)
+const T2_START_X = 50; // 타워2 왼쪽 시작 (간격: 20~50 = 30유닛 공백)
+const F1_PLACEHOLDER = [
+  // ── 타워1: 사무실 + 엘리베이터 영역 ──
+  { name: '사무실 A', color: 0xfbbf24, x: -75, z:  5, w: 55, d: 42 },
+  { name: '사무실 B', color: 0xfbbf24, x: -75, z: 52, w: 55, d: 40 },
+  { name: null, _zoneOverlay: true, color: 0x78350f, x: -80, z: 0, w: T1_END_X + 80, d: 100 },
+  // ── 타워1 오른쪽 벽 ──
+  { name: null, color: 0xfbbf24, x: T1_END_X - 1, z: 0, w: 2, d: 100 },
+  // ── 타워2 왼쪽 벽 ──
+  { name: null, color: 0xa5f3fc, x: T2_START_X,   z: 0, w: 2, d: 100 },
+  // ── 타워2: 기존 건물 영역 ──
+  { name: null, _zoneOverlay: true, color: 0x0f3460, x: T2_START_X + 2, z: 0, w: 158 - T2_START_X, d: 100 },
+];
+
+function initPlaceholderFloor(floorId, yBase, rooms, floorSize, options = {}) {
+  const fs = floorSize ?? FLOOR; // 커스텀 크기 없으면 LF 기본값 사용
+  const isDiffBuilding = options.differentBuilding ?? false;
+  const group = new THREE.Group();
+  group.position.y = yBase;
+  group.userData.floorId = floorId;
+  scene.add(group);
+
+  const floorColor = floorId === 'GF' ? 0x1e3a8a : isDiffBuilding ? 0x451a03 : 0x14532d;
+  const borderColor = floorId === 'GF' ? 0x60a5fa : isDiffBuilding ? 0xfbbf24 : 0x34d399;
+  const floorMesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(fs.W, fs.D),
+    new THREE.MeshStandardMaterial({ color: floorColor, transparent: true, opacity: 0.18, side: THREE.DoubleSide, depthWrite: false })
+  );
+  floorMesh.rotation.x = -Math.PI / 2;
+  floorMesh.position.set(fs.CX, 0.02, fs.CZ);
+  floorMesh.userData.floorId = floorId;
+  group.add(floorMesh);
+
+  // 테두리: zones가 있으면 구역별 개별 테두리, 없으면 전체 테두리
+  if (options.zones?.some(z => z.border)) {
+    options.zones.forEach(zone => {
+      if (!zone.border) return;
+      const b = zone.border;
+      const bw = b.w, bd = b.d;
+      const bLine = new THREE.LineSegments(
+        new THREE.EdgesGeometry(new THREE.BoxGeometry(bw, 0.3, bd)),
+        new THREE.LineBasicMaterial({ color: b.color, transparent: false })
+      );
+      bLine.position.set(b.x + bw / 2, 0, b.z + bd / 2);
+      bLine.userData.floorId = floorId;
+      group.add(bLine);
+    });
+  } else {
+    const border = new THREE.LineSegments(
+      new THREE.EdgesGeometry(new THREE.BoxGeometry(fs.W, 0.05, fs.D)),
+      new THREE.LineBasicMaterial({ color: borderColor, transparent: true, opacity: 1.0 })
+    );
+    border.position.set(fs.CX, 0, fs.CZ);
+    border.userData.floorId = floorId;
+    group.add(border);
+  }
+
+  // 방 박스 + 와이어프레임 + 이름 라벨
+  const defaultWireColor = floorId === 'GF' ? 0x93c5fd : 0x6ee7b7;
+  rooms.forEach(r => {
+    const cx = r.x + r.w / 2, cz = r.z + r.d / 2;
+    const ROOM_H = 2.5;
+
+    // 구역 오버레이 (바닥 평면만)
+    if (r._zoneOverlay) {
+      const overlay = new THREE.Mesh(
+        new THREE.PlaneGeometry(r.w, r.d),
+        new THREE.MeshBasicMaterial({ color: r.color, transparent: true, opacity: 0.12, depthWrite: false, side: THREE.DoubleSide })
+      );
+      overlay.rotation.x = -Math.PI / 2;
+      overlay.position.set(cx, 0.04, cz);
+      overlay.userData.floorId = floorId;
+      group.add(overlay);
+      return;
+    }
+
+    // 반투명 채움
+    if (r.name) {
+      const fill = new THREE.Mesh(
+        new THREE.BoxGeometry(r.w, ROOM_H, r.d),
+        new THREE.MeshStandardMaterial({ color: r.color ?? defaultWireColor, transparent: true, opacity: 0.22, depthWrite: false })
+      );
+      fill.position.set(cx, ROOM_H / 2, cz);
+      fill.userData.floorId = floorId;
+      group.add(fill);
+    }
+
+    // 아웃라인
+    const wire = new THREE.LineSegments(
+      new THREE.EdgesGeometry(new THREE.BoxGeometry(r.w, ROOM_H, r.d)),
+      new THREE.LineBasicMaterial({ color: r.color ?? defaultWireColor, transparent: true, opacity: r.name ? 0.7 : 0.35 })
+    );
+    wire.position.set(cx, ROOM_H / 2, cz);
+    wire.userData.floorId = floorId;
+    group.add(wire);
+
+    // 이름 라벨
+    if (r.name) {
+      const div = document.createElement('div');
+      div.className = 'gf-room-label';
+      div.textContent = r.name;
+      div.style.color = '#' + (r.color ?? defaultWireColor).toString(16).padStart(6, '0');
+      const lObj = new CSS2DObject(div);
+      lObj.position.set(cx, ROOM_H + 0.8, cz);
+      lObj.userData.floorId = floorId;
+      group.add(lObj);
+    }
+  });
+
+  // 층 라벨 (zones 있으면 구역별, 없으면 단일 라벨)
+  if (options.zones?.length) {
+    options.zones.forEach(zone => {
+      const div = document.createElement('div');
+      div.className = 'floor-placeholder-label floor-zone-label';
+      div.innerHTML = `<span style="color:${zone.color}">${zone.label}</span><small>${zone.sub ?? '도면 준비 중'}</small>`;
+      const lObj = new CSS2DObject(div);
+      lObj.position.set(zone.cx, 6, zone.cz);
+      lObj.userData.floorId = floorId;
+      group.add(lObj);
+    });
+  } else {
+    const div = document.createElement('div');
+    div.className = 'floor-placeholder-label';
+    const floorLabel = options.label ?? (floorId === 'GF' ? 'GF층' : '1층');
+    div.innerHTML = `<span>${floorLabel}</span><small>도면 준비 중</small>`;
+    const lObj = new CSS2DObject(div);
+    lObj.position.set(fs.CX, 6, fs.CZ);
+    lObj.userData.floorId = floorId;
+    group.add(lObj);
+  }
+
+  return group;
+}
+
+function createConnector(x, z, color, label, h) {
+  const mat = new THREE.MeshStandardMaterial({
+    color, emissive: color, emissiveIntensity: 0.7,
+    transparent: true, opacity: 0.75
+  });
+  const mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, h, 8), mat);
+  mesh.position.set(x, h / 2, z);
+  mesh.userData.floorId = 'connector';
+  scene.add(mesh);
+
+  const div = document.createElement('div');
+  div.className = 'connector-label';
+  div.textContent = label;
+  const lObj = new CSS2DObject(div);
+  lObj.position.set(x, h + 1.5, z);
+  lObj.userData.floorId = 'connector';
+  scene.add(lObj);
+}
+
+function initVerticalConnectors() {
+  const totalH = FLOOR_GAP * 2 + 4;
+  // 에스컬레이터 (전층, ENT-1 근처)
+  createConnector(120.96, 39.50, 0xf59e0b, '🚶 에스컬레이터', totalH);
+  // 엘리베이터 (전층, ELV-1)
+  createConnector(13.85, 35.62, 0x3b82f6, '🛗 엘리베이터', totalH);
+}
+
+function setActiveFloor(floorId) {
+  state.activeFloor = floorId;
+
+  scene.traverse(obj => {
+    const fid = obj.userData.floorId;
+    if (!fid || fid === 'connector' || fid === 'global') return;
+    const on = fid === floorId;
+
+    if (obj.isMesh) {
+      const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+      mats.forEach(mat => {
+        if (mat.userData.base === undefined) mat.userData.base = mat.opacity ?? 1.0;
+        mat.transparent = true;
+        mat.opacity = on ? mat.userData.base : 0.07;
+        mat.needsUpdate = true;
+      });
+    }
+    if (obj.isLine || obj.isLineSegments) {
+      const mat = obj.material;
+      if (mat.userData.base === undefined) mat.userData.base = mat.opacity ?? 1.0;
+      mat.transparent = true;
+      mat.opacity = on ? mat.userData.base : 0.05;
+    }
+    if (obj instanceof CSS2DObject) {
+      obj.element.style.opacity = on ? '' : '0';
+      obj.element.style.pointerEvents = on ? '' : 'none';
+    }
+  });
+
+  // 카메라를 활성 층 높이로 이동
+  const def = FLOOR_DEFS.find(f => f.id === floorId);
+  if (def) {
+    const offset = new THREE.Vector3().subVectors(camera.position, controls.target);
+    state.flyTarget = {
+      pos:  new THREE.Vector3(FLOOR.CX, def.yBase + Math.max(offset.y, 15), FLOOR.CZ + Math.abs(offset.z)),
+      look: new THREE.Vector3(FLOOR.CX, def.yBase, FLOOR.CZ),
+    };
+  }
+
+  document.querySelectorAll('.floor-btn').forEach(b => b.classList.toggle('floor-btn--active', b.dataset.floor === floorId));
+}
+
+initPlaceholderFloor('GF', FLOOR_GAP, GF_PLACEHOLDER, GF_FLOOR);
+initPlaceholderFloor('1F', FLOOR_GAP * 2, F1_PLACEHOLDER, F1_FLOOR, {
+  differentBuilding: true,
+  zones: [
+    {
+      label: '서울숲더샵 타워1', sub: '엘리베이터 포함',
+      cx: -30, cz: 50, color: '#fbbf24',
+      border: { x: -80, z: 0, w: T1_END_X + 80, d: 100, color: 0xfbbf24 },
+    },
+    {
+      label: '타워2 (서울숲 사옥)', sub: '에스컬레이터 연결',
+      cx: 104, cz: 50, color: '#a5f3fc',
+      border: { x: T2_START_X, z: 0, w: 158 - T2_START_X, d: 100, color: 0xa5f3fc },
+    },
+  ],
+});
+initVerticalConnectors();
+setActiveFloor('LF'); // 초기 상태 적용
 
 // ── 바닥 그리드 (3D 원근감 강화) ──────────────────────────────
 (function initSceneGrid() {
@@ -893,27 +1178,79 @@ document.getElementById('onboard-close').addEventListener('click', () => {
   localStorage.setItem('lf-onboarded', '1');
 });
 
+function syncDesks(desksData) {
+  // Remove stale desks
+  for (const [name] of personalDeskMeshes) {
+    if (!desksData[name]) {
+      const { group, labelObj } = personalDeskMeshes.get(name);
+      scene.remove(group);
+      scene.remove(labelObj);
+      personalDeskMeshes.delete(name);
+    }
+  }
+  // Add / update desks
+  for (const [name, { x, z, emoji }] of Object.entries(desksData)) {
+    if (personalDeskMeshes.has(name)) {
+      const { group, labelObj } = personalDeskMeshes.get(name);
+      group.position.set(x, 0, z);
+      labelObj.position.set(x, 1.4, z);
+    } else {
+      const group = new THREE.Group();
+      group.position.set(x, 0, z);
+      group.userData.floorId = 'LF';
+
+      const geo = new THREE.BoxGeometry(2.2, 0.3, 1.6);
+      const mat = new THREE.MeshStandardMaterial({ color: 0xd4a060, transparent: true, opacity: 0.88 });
+      const deskMesh = new THREE.Mesh(geo, mat);
+      deskMesh.position.y = 0.15;
+      deskMesh.userData.floorId = 'LF';
+      deskMesh.userData.deskName = name;
+      group.add(deskMesh);
+
+      const edges = new THREE.EdgesGeometry(geo);
+      const lineMat = new THREE.LineBasicMaterial({ color: 0x7a4a1e, transparent: true, opacity: 0.9 });
+      const line = new THREE.LineSegments(edges, lineMat);
+      line.position.y = 0.15;
+      line.userData.floorId = 'LF';
+      group.add(line);
+
+      scene.add(group);
+
+      const div = document.createElement('div');
+      div.className = 'personal-desk-label';
+      div.innerHTML = `<span class="pdl-emoji">${emoji || '🙂'}</span><span class="pdl-name">${name}</span>`;
+      const labelObj = new CSS2DObject(div);
+      labelObj.position.set(x, 1.4, z);
+      labelObj.userData.floorId = 'LF';
+      scene.add(labelObj);
+
+      personalDeskMeshes.set(name, { group, mesh: deskMesh, labelObj });
+    }
+  }
+  // Re-apply floor opacity for newly added desks
+  if (state.activeFloor !== 'LF') setActiveFloor(state.activeFloor);
+}
+
 socket.on('joined', ({ color }) => {
   state.myColor = color;
   state.myId = socket.id;
   state.joined = true;
 
-  // 재연결인 경우 마지막 위치 복원, 최초 접속은 스폰 위치
   const pos = state.lastPos ?? getSpawnPosition();
   emitLocation(pos.x, pos.z);
 
   updateProfileBtn();
-  if (!urlRoom && !state.lastPos) checkOnboarding(); // 재연결 시 온보딩 생략
+  if (!urlRoom && !state.lastPos) checkOnboarding();
   if (urlRoom) {
     setTimeout(() => highlightRoomById(urlRoom), 700);
   }
-  // 모바일: 내 위치로 카메라 이동 (줌 유지)
   if (window.innerWidth <= 768) {
     setTimeout(() => flyToRoom(pos.x, pos.z), 300);
   }
 });
 
 socket.on('users-update', syncPins);
+socket.on('desks-update', syncDesks);
 socket.on('connect_error', () => console.warn('[소켓] 연결 실패, 재시도 중...'));
 
 // ── 연결 끊김 / 재연결 ───────────────────────────────────────
@@ -1049,6 +1386,23 @@ renderer.domElement.addEventListener('mousemove', (e) => {
   const { x, y } = getMouseNDC(e);
   mouse.set(x, y);
   raycaster.setFromCamera(mouse, camera);
+
+  // 자리 지정 모드: ghost 미리보기
+  if (state.deskPickingMode) {
+    const floorHit = raycaster.intersectObject(pickPlane);
+    if (floorHit.length > 0) {
+      const { x: fx, z: fz } = floorHit[0].point;
+      deskGhost.position.set(fx, 0.15, fz);
+      deskGhostEdge.position.set(fx, 0.15, fz);
+      deskGhost.visible = true;
+      deskGhostEdge.visible = true;
+    } else {
+      deskGhost.visible = false;
+      deskGhostEdge.visible = false;
+    }
+    return;
+  }
+
   const hits = raycaster.intersectObjects(roomMeshes);
 
   if (state.hoveredMesh && (hits.length === 0 || hits[0].object !== state.hoveredMesh)) {
@@ -1078,6 +1432,14 @@ renderer.domElement.addEventListener('click', (e) => {
     return;
   }
 
+  const deskClickHits = raycaster.intersectObjects(Array.from(personalDeskMeshes.values()).map(d => d.mesh));
+  if (deskClickHits.length > 0) {
+    const n = deskClickHits[0].object.userData.deskName;
+    const d = personalDeskMeshes.get(n);
+    if (d) flyTo(d.group.position.x, d.group.position.z, 20);
+    return;
+  }
+
   const roomHits = raycaster.intersectObjects(roomMeshes);
   if (roomHits.length > 0) {
     showRoomInfo(roomHits[0].object.userData.room);
@@ -1085,11 +1447,20 @@ renderer.domElement.addEventListener('click', (e) => {
   }
 
   if (state.pickingMode) {
-    const floorHit = raycaster.intersectObject(floor);
+    const floorHit = raycaster.intersectObject(pickPlane);
     if (floorHit.length > 0) {
       const { x: fx, z: fz } = floorHit[0].point;
       emitLocation(fx, fz);
       exitPickMode();
+    }
+  }
+
+  if (state.deskPickingMode) {
+    const floorHit = raycaster.intersectObject(pickPlane);
+    if (floorHit.length > 0) {
+      const { x: fx, z: fz } = floorHit[0].point;
+      socket.emit('set-desk', { x: fx, z: fz });
+      exitDeskPickMode();
     }
   }
 });
@@ -1113,6 +1484,14 @@ renderer.domElement.addEventListener('touchend', (e) => {
     return;
   }
 
+  const deskTouchHits = raycaster.intersectObjects(Array.from(personalDeskMeshes.values()).map(d => d.mesh));
+  if (deskTouchHits.length > 0) {
+    const n = deskTouchHits[0].object.userData.deskName;
+    const d = personalDeskMeshes.get(n);
+    if (d) flyTo(d.group.position.x, d.group.position.z, 20);
+    return;
+  }
+
   // 방 터치 → 정보 패널
   const roomHits = raycaster.intersectObjects(roomMeshes);
   if (roomHits.length > 0) {
@@ -1122,11 +1501,20 @@ renderer.domElement.addEventListener('touchend', (e) => {
 
   // 위치 설정 모드에서 바닥 터치 → 핀 이동
   if (state.pickingMode) {
-    const floorHit = raycaster.intersectObject(floor);
+    const floorHit = raycaster.intersectObject(pickPlane);
     if (floorHit.length > 0) {
       const { x: fx, z: fz } = floorHit[0].point;
       emitLocation(fx, fz);
       exitPickMode();
+    }
+  }
+
+  if (state.deskPickingMode) {
+    const floorHit = raycaster.intersectObject(pickPlane);
+    if (floorHit.length > 0) {
+      const { x: fx, z: fz } = floorHit[0].point;
+      socket.emit('set-desk', { x: fx, z: fz });
+      exitDeskPickMode();
     }
   }
 }, { passive: true });
@@ -1172,6 +1560,7 @@ window.addEventListener('keydown', e => {
   // ESC키: pick 모드 종료 / 방 정보 패널 닫기 / 채팅바 닫기
   if (e.key === 'Escape') {
     if (state.pickingMode) exitPickMode();
+    if (state.deskPickingMode) exitDeskPickMode();
     document.getElementById('room-info-panel').hidden = true;
     document.getElementById('chat-bar').hidden = true;
     syncJoystickPos();
@@ -1361,10 +1750,32 @@ if (urlRoom) {
   socket.emit('join', { name: '방문자', emoji: '🙂' });
 }
 
+// ── 개인 자리 등록 모드 ──────────────────────────────────────
+function enterDeskPickMode() {
+  state.deskPickingMode = true;
+  renderer.domElement.style.cursor = 'crosshair';
+  const btn = document.getElementById('desk-btn');
+  btn.textContent = '🪑 클릭하여 자리 지정 중...';
+  btn.classList.add('active');
+  const hint = document.getElementById('pick-hint');
+  hint.textContent = '바닥을 클릭하여 내 자리를 지정하세요';
+  hint.hidden = false;
+}
+function exitDeskPickMode() {
+  state.deskPickingMode = false;
+  deskGhost.visible = false;
+  deskGhostEdge.visible = false;
+  renderer.domElement.style.cursor = 'default';
+  const btn = document.getElementById('desk-btn');
+  btn.textContent = '🪑 내 자리 등록';
+  btn.classList.remove('active');
+  const hint = document.getElementById('pick-hint');
+  hint.hidden = true;
+  hint.textContent = '바닥을 클릭하여 현재 위치를 지정하세요';
+}
+
 // ── 위치 설정 모드 ────────────────────────────────────────────
 function enterPickMode() {
-  state.floorWasVisible = floor.visible;
-  floor.visible = true; // raycaster needs visible floor
   state.pickingMode = true;
   renderer.domElement.style.cursor = 'crosshair';
   const btn = document.getElementById('locate-btn');
@@ -1374,7 +1785,6 @@ function enterPickMode() {
 }
 function exitPickMode() {
   state.pickingMode = false;
-  floor.visible = state.floorWasVisible;
   renderer.domElement.style.cursor = 'default';
   const btn = document.getElementById('locate-btn');
   btn.textContent = '📍 내 위치 설정';
@@ -1407,6 +1817,9 @@ document.getElementById('compass')?.addEventListener('click', () => {
   flyToAzimuth(0);
 });
 
+// 층 스위처
+window.setActiveFloor = setActiveFloor;
+
 // 화면 방향 초기화 (PC 버튼)
 window.resetCameraRotation = () => { flyToAzimuth(0); };
 
@@ -1418,6 +1831,10 @@ window.flyToMyPin = () => {
 
 document.getElementById('locate-btn').addEventListener('click', () => {
   state.pickingMode ? exitPickMode() : enterPickMode();
+});
+
+document.getElementById('desk-btn').addEventListener('click', () => {
+  state.deskPickingMode ? exitDeskPickMode() : enterDeskPickMode();
 });
 
 // ── 타입 필터 ─────────────────────────────────────────────────
