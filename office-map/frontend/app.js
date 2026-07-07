@@ -419,22 +419,29 @@ function initDesks() {
 function initFacilities() {
   FACILITIES.forEach(fac => {
     const isToilet = fac.type === 'toilet';
-    const color   = isToilet ? 0x60a5fa : 0xf59e0b;
+    const isFridge = fac.type === 'fridge';
+    const color = isToilet ? 0x60a5fa : isFridge ? 0x06b6d4 : 0xf59e0b;
     const g = new THREE.Group();
     g.position.set(fac.x, 0, fac.z);
     scene.add(g);
+    const size = isFridge ? 3.0 : 2.2;
     const marker = new THREE.Mesh(
-      new THREE.PlaneGeometry(2.2, 2.2),
-      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.28, depthWrite: false })
+      new THREE.PlaneGeometry(size, size),
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: isFridge ? 0.45 : 0.28, depthWrite: false })
     );
     marker.rotation.x = -Math.PI / 2;
     marker.position.y = 0.06;
     g.add(marker);
     const div = document.createElement('div');
     div.className = `facility-label facility-${fac.type}`;
-    div.textContent = isToilet ? '🚾' : '📞';
+    if (isFridge) {
+      const lines = fac.name.split('\n');
+      div.innerHTML = `🧊<br><span>${lines.join('<br>')}</span>`;
+    } else {
+      div.textContent = isToilet ? '🚾' : '📞';
+    }
     const labelObj = new CSS2DObject(div);
-    labelObj.position.set(0, 2.0, 0);
+    labelObj.position.set(0, isFridge ? 3.0 : 2.0, 0);
     g.add(labelObj);
   });
 }

@@ -262,6 +262,15 @@ body { font-family: -apple-system, 'Noto Sans KR', sans-serif; background: var(-
   line-height: 1;
   filter: drop-shadow(0 0 3px rgba(0,0,0,0.8));
 }
+.facility-fridge {
+  display: flex; flex-direction: column; align-items: center; text-align: center;
+  font-size: 16px; line-height: 1.3;
+}
+.facility-fridge span {
+  font-size: 9.5px; color: #a5f3fc; font-weight: 700;
+  text-shadow: 0 1px 3px rgba(0,0,0,1), 0 0 6px rgba(0,0,0,0.9);
+  white-space: nowrap;
+}
 
 /* 데스크 영역 라벨 */
 .desk-label {
