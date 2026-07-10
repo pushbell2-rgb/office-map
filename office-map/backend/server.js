@@ -22,11 +22,40 @@ function savePositions() {
   fs.writeFile(POSITIONS_FILE, JSON.stringify(savedPositions, null, 2), () => {});
 }
 
+// ── 접속 로그 ─────────────────────────────────────────────────
+// 누가(name) / 언제(connectedAt) / 어떤 브라우저(clientId)로 접속했는지 기록
+const CONNECTIONS_FILE = path.join(__dirname, 'connections.json');
+const MAX_LOG = 5000; // 로그 무한 증가 방지 (최근 5000건 유지)
+let connectionLog = [];
+try {
+  const raw = fs.readFileSync(CONNECTIONS_FILE, 'utf8');
+  connectionLog = JSON.parse(raw || '[]');
+  if (!Array.isArray(connectionLog)) connectionLog = [];
+  console.log('[접속로그] 기존 로그 로드:', connectionLog.length, '건');
+} catch (e) {
+  connectionLog = [];
+}
+
+function logConnection(entry) {
+  connectionLog.push(entry);
+  if (connectionLog.length > MAX_LOG) connectionLog = connectionLog.slice(-MAX_LOG);
+  fs.writeFile(CONNECTIONS_FILE, JSON.stringify(connectionLog, null, 2), () => {});
+}
+
 app.use(express.static(path.join(__dirname, '../frontend')));
 app.use('/public', express.static(path.join(__dirname, '../public')));
 
 app.get('/api/positions', (req, res) => {
   res.json(savedPositions);
+});
+
+// 접속 로그 조회. ?key=minjong123 일치할 때만 응답
+const LOG_KEY = 'minjong123';
+app.get('/api/connections', (req, res) => {
+  if (req.query.key !== LOG_KEY) {
+    return res.status(403).json({ error: 'forbidden' });
+  }
+  res.json({ count: connectionLog.length, connections: connectionLog });
 });
 
 const users = new Map();
@@ -43,7 +72,7 @@ io.on('connection', (socket) => {
 
   socket.emit('users-update', Array.from(users.values()));
 
-  socket.on('join', ({ name, emoji }) => {
+  socket.on('join', ({ name, emoji, clientId }) => {
     const userName = name || '익명';
     users.set(socket.id, {
       id: socket.id,
@@ -51,6 +80,12 @@ io.on('connection', (socket) => {
       emoji: emoji || '🙂',
       x: null, z: null,
       color,
+    });
+    logConnection({
+      name: userName,
+      clientId: clientId || null,   // 브라우저별 영속 ID (IP 대신 사용자 구분값)
+      socketId: socket.id,          // 세션별 소켓 ID (재접속 시 변경됨)
+      connectedAt: new Date().toISOString(),
     });
     socket.emit('joined', { color });
     socket.emit('desks-update', savedPositions);
@@ -66,6 +101,13 @@ io.on('connection', (socket) => {
     const user = users.get(socket.id);
     if (!user) return;
     savedPositions[user.name] = { x, z, emoji: user.emoji };
+    savePositions();
+    io.emit('desks-update', savedPositions);
+  });
+
+  socket.on('delete-desk', ({ name }) => {
+    if (!name || !savedPositions[name]) return;
+    delete savedPositions[name];
     savePositions();
     io.emit('desks-update', savedPositions);
   });

@@ -1097,6 +1097,16 @@ function syncPins(users) {
 // ── 채팅 메시지 수신 ─────────────────────────────────────────
 const socket = io();
 
+// 접속 로그용 사용자 구분값 (IP 대신 브라우저별 영속 ID)
+const clientId = (() => {
+  let id = localStorage.getItem('lf-client-id');
+  if (!id) {
+    id = 'c-' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+    localStorage.setItem('lf-client-id', id);
+  }
+  return id;
+})();
+
 function showChatBubble(id, message, color) {
   const pin = userPins.get(id);
   if (!pin || !pin.userData.bubbleDiv) return false;
@@ -1265,7 +1275,7 @@ socket.on('connect', () => {
   // 재연결 시 세션 자동 복구
   if (state.joined) {
     state.myId = socket.id;
-    socket.emit('join', { name: state.myName, emoji: state.myEmoji });
+    socket.emit('join', { name: state.myName, emoji: state.myEmoji, clientId });
   }
 });
 
@@ -1434,9 +1444,7 @@ renderer.domElement.addEventListener('click', (e) => {
 
   const deskClickHits = raycaster.intersectObjects(Array.from(personalDeskMeshes.values()).map(d => d.mesh));
   if (deskClickHits.length > 0) {
-    const n = deskClickHits[0].object.userData.deskName;
-    const d = personalDeskMeshes.get(n);
-    if (d) flyTo(d.group.position.x, d.group.position.z, 20);
+    showDeskOptions(deskClickHits[0].object.userData.deskName);
     return;
   }
 
@@ -1486,9 +1494,7 @@ renderer.domElement.addEventListener('touchend', (e) => {
 
   const deskTouchHits = raycaster.intersectObjects(Array.from(personalDeskMeshes.values()).map(d => d.mesh));
   if (deskTouchHits.length > 0) {
-    const n = deskTouchHits[0].object.userData.deskName;
-    const d = personalDeskMeshes.get(n);
-    if (d) flyTo(d.group.position.x, d.group.position.z, 20);
+    showDeskOptions(deskTouchHits[0].object.userData.deskName);
     return;
   }
 
@@ -1644,6 +1650,49 @@ document.getElementById('fridge-popup-close').addEventListener('click', () => {
   repositionLeftPanels();
 });
 
+// ── 개인 자리 옵션 / 삭제 ─────────────────────────────────────
+const deskOptionsModal = document.getElementById('desk-options-modal');
+const deskConfirmModal = document.getElementById('desk-confirm-modal');
+
+function showDeskOptions(name) {
+  state.selectedDeskName = name;
+  document.getElementById('desk-options-name').textContent = name;
+  deskOptionsModal.hidden = false;
+}
+
+document.getElementById('desk-goto-btn').addEventListener('click', () => {
+  const d = personalDeskMeshes.get(state.selectedDeskName);
+  if (d) flyTo(d.group.position.x, d.group.position.z, 20);
+  deskOptionsModal.hidden = true;
+});
+
+document.getElementById('desk-delete-btn').addEventListener('click', () => {
+  deskOptionsModal.hidden = true;
+  document.getElementById('desk-confirm-name').textContent = state.selectedDeskName;
+  deskConfirmModal.hidden = false;
+});
+
+document.getElementById('desk-options-cancel').addEventListener('click', () => {
+  deskOptionsModal.hidden = true;
+});
+
+document.getElementById('desk-confirm-cancel').addEventListener('click', () => {
+  deskConfirmModal.hidden = true;
+});
+
+document.getElementById('desk-confirm-delete').addEventListener('click', () => {
+  if (state.selectedDeskName) socket.emit('delete-desk', { name: state.selectedDeskName });
+  deskConfirmModal.hidden = true;
+});
+
+// 배경(오버레이) 클릭 시 닫기
+deskOptionsModal.addEventListener('click', (e) => {
+  if (e.target === deskOptionsModal) deskOptionsModal.hidden = true;
+});
+deskConfirmModal.addEventListener('click', (e) => {
+  if (e.target === deskConfirmModal) deskConfirmModal.hidden = true;
+});
+
 // ── 방 정보 패널 ─────────────────────────────────────────────
 function showRoomInfo(room) {
   clearPath(); // 다른 방 선택 시 이전 경로 + 강조 해제
@@ -1736,7 +1785,7 @@ document.getElementById('room-info-close').onclick = () => {
 function joinSession() {
   const name = document.getElementById('name-input').value.trim() || '익명';
   state.myName = name;
-  socket.emit('join', { name, emoji: state.myEmoji });
+  socket.emit('join', { name, emoji: state.myEmoji, clientId });
   document.getElementById('join-overlay').hidden = true;
 }
 document.getElementById('join-btn').addEventListener('click', joinSession);
@@ -1747,7 +1796,7 @@ document.getElementById('name-input').addEventListener('keydown', e => {
 // URL 파라미터가 있으면 자동 입장 (이름 입력 생략)
 if (urlRoom) {
   document.getElementById('join-overlay').hidden = true;
-  socket.emit('join', { name: '방문자', emoji: '🙂' });
+  socket.emit('join', { name: '방문자', emoji: '🙂', clientId });
 }
 
 // ── 개인 자리 등록 모드 ──────────────────────────────────────

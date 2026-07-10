@@ -45,6 +45,30 @@
     </div>
   </div>
 
+  <!-- 자리 옵션 모달 -->
+  <div id="desk-options-modal" class="modal-overlay" hidden>
+    <div class="modal-card">
+      <h2 class="modal-title">🪑 <span id="desk-options-name"></span> 자리</h2>
+      <div class="modal-actions" style="flex-direction:column;">
+        <button id="desk-goto-btn" class="btn-join" style="width:100%;padding:10px;font-size:14px;">📍 이 자리로 이동</button>
+        <button id="desk-delete-btn" class="btn-secondary" style="width:100%;color:#ef4444;border-color:#ef4444;">🗑️ 자리 삭제</button>
+        <button id="desk-options-cancel" class="btn-secondary" style="width:100%;">닫기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 자리 삭제 확인 모달 -->
+  <div id="desk-confirm-modal" class="modal-overlay" hidden>
+    <div class="modal-card">
+      <h2 class="modal-title">자리 삭제</h2>
+      <p style="font-size:13px;color:var(--text-muted);line-height:1.6;">'<b id="desk-confirm-name" style="color:var(--text);"></b>' 님의 자리를 삭제할까요?<br>이 작업은 되돌릴 수 없습니다.</p>
+      <div class="modal-actions">
+        <button id="desk-confirm-cancel" class="btn-secondary">취소</button>
+        <button id="desk-confirm-delete" class="btn-join" style="flex:1;padding:10px;font-size:14px;background:#ef4444;">삭제</button>
+      </div>
+    </div>
+  </div>
+
   <!-- 온보딩 가이드 -->
   <div id="onboard-overlay" class="onboard-overlay" hidden>
     <div class="onboard-card">
