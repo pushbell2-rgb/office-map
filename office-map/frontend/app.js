@@ -954,7 +954,51 @@ function setActiveFloor(floorId) {
   }
 
   document.querySelectorAll('.floor-btn').forEach(b => b.classList.toggle('floor-btn--active', b.dataset.floor === floorId));
+  document.querySelectorAll('.floor-option').forEach(b => b.classList.toggle('floor-option--active', b.dataset.floor === floorId));
+  if (def) document.getElementById('floor-select-label').textContent = def.label;
 }
+
+// ── 상단 층 선택 (PC: 드롭다운 / 모바일: 팝업) ──────────────────
+const floorSelectBtn = document.getElementById('floor-select-btn');
+const floorMenu      = document.getElementById('floor-menu');
+const floorModal     = document.getElementById('floor-modal');
+
+// 위층부터 표시
+[floorMenu, document.getElementById('floor-modal-list')].forEach(list => {
+  [...FLOOR_DEFS].reverse().forEach(f => {
+    const btn = document.createElement('button');
+    btn.className = 'floor-option';
+    btn.dataset.floor = f.id;
+    btn.setAttribute('role', 'option');
+    btn.textContent = f.label;
+    btn.addEventListener('click', () => {
+      setActiveFloor(f.id);
+      closeFloorSelect();
+    });
+    list.appendChild(btn);
+  });
+});
+
+function closeFloorSelect() {
+  floorMenu.hidden = true;
+  floorModal.hidden = true;
+  floorSelectBtn.setAttribute('aria-expanded', 'false');
+}
+
+floorSelectBtn.addEventListener('click', e => {
+  e.stopPropagation();
+  if (window.innerWidth <= 768) {
+    floorModal.hidden = false;
+  } else {
+    floorMenu.hidden = !floorMenu.hidden;
+    floorSelectBtn.setAttribute('aria-expanded', String(!floorMenu.hidden));
+  }
+});
+document.getElementById('floor-modal-cancel').addEventListener('click', closeFloorSelect);
+floorModal.addEventListener('click', e => { if (e.target === floorModal) closeFloorSelect(); });
+document.addEventListener('click', e => {
+  if (!floorMenu.hidden && !e.target.closest('.floor-select')) closeFloorSelect();
+});
 
 initPlaceholderFloor('GF', FLOOR_GAP, GF_PLACEHOLDER, GF_FLOOR);
 initPlaceholderFloor('1F', FLOOR_GAP * 2, F1_PLACEHOLDER, F1_FLOOR, {
@@ -1565,6 +1609,7 @@ window.addEventListener('keydown', e => {
 
   // ESC키: pick 모드 종료 / 방 정보 패널 닫기 / 채팅바 닫기
   if (e.key === 'Escape') {
+    closeFloorSelect();
     if (state.pickingMode) exitPickMode();
     if (state.deskPickingMode) exitDeskPickMode();
     document.getElementById('room-info-panel').hidden = true;

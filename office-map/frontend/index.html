@@ -45,6 +45,17 @@
     </div>
   </div>
 
+  <!-- 층 선택 모달 (모바일) -->
+  <div id="floor-modal" class="modal-overlay floor-modal" hidden>
+    <div class="modal-card">
+      <h2 class="modal-title">🏢 층 선택</h2>
+      <div id="floor-modal-list" class="floor-modal-list"></div>
+      <div class="modal-actions">
+        <button id="floor-modal-cancel" class="btn-secondary">닫기</button>
+      </div>
+    </div>
+  </div>
+
   <!-- 자리 옵션 모달 -->
   <div id="desk-options-modal" class="modal-overlay" hidden>
     <div class="modal-card">
@@ -126,7 +137,12 @@
 
       <!-- 상단 바 -->
       <div class="top-bar">
-        <span class="top-title">서울숲 LF층.</span>
+        <div class="floor-select">
+          <button id="floor-select-btn" class="top-title floor-select-btn" aria-haspopup="listbox" aria-expanded="false">
+            서울숲 <span id="floor-select-label">LF층</span> <span class="floor-select-caret">▾</span>
+          </button>
+          <div id="floor-menu" class="floor-menu" role="listbox" hidden></div>
+        </div>
         <button id="floor-toggle-btn" class="btn-topbar">🗺 도면 보기</button>
         <button id="reset-camera-btn" class="btn-topbar">👁 탑다운</button>
         <button id="locate-btn" class="btn-locate">📍 내 위치 설정</button>
