@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { ROOMS, ROOM_TYPES, ENTRANCES, CORRIDORS, WALLS, DESKS, FACILITIES } from './map-data.js';
+import { initFortune } from './fortune.js';
 
 // ── 상수 ─────────────────────────────────────────────────────
 const FLOOR = { W: 158, D: 100, CX: 79, CZ: 50 };
@@ -1150,6 +1151,8 @@ const clientId = (() => {
   }
   return id;
 })();
+
+initFortune({ clientId, getName: () => state.myName });
 
 function showChatBubble(id, message, color) {
   const pin = userPins.get(id);

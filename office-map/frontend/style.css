@@ -1057,3 +1057,214 @@ body { font-family: -apple-system, 'Noto Sans KR', sans-serif; background: var(-
   .mob-nav-btn > span:first-child { font-size: 20px; line-height: 1; }
   .mob-nav-btn:active { color: var(--accent); }
 }
+
+/* ── 오늘의 출근 운세: 배너 ─────────────────────────────────── */
+.fortune-banner {
+  position: absolute; top: 72px; left: 50%; transform: translateX(-50%);
+  z-index: 1100;
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px 8px 12px;
+  background: linear-gradient(120deg, rgba(76,29,149,0.92), rgba(190,24,93,0.88));
+  border: 1px solid rgba(244,114,182,0.6);
+  border-radius: 16px;
+  color: #fff; font-family: inherit; text-align: left;
+  cursor: pointer; overflow: hidden;
+  box-shadow: 0 6px 24px rgba(190,24,93,0.35);
+  transition: transform .15s, box-shadow .15s;
+}
+.fortune-banner[hidden] { display: none; }
+.fortune-banner:hover { transform: translateX(-50%) translateY(-2px); box-shadow: 0 10px 28px rgba(190,24,93,0.5); }
+.fortune-banner::after { /* 반짝 지나가는 빛 */
+  content: ""; position: absolute; top: 0; bottom: 0; width: 40%; left: -60%;
+  background: linear-gradient(100deg, transparent, rgba(255,255,255,0.35), transparent);
+  animation: fortune-shimmer 3.2s ease-in-out infinite;
+  pointer-events: none;
+}
+.fortune-banner-icon { font-size: 24px; animation: fortune-wobble 2.4s ease-in-out infinite; }
+.fortune-banner-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.fortune-banner-text b { font-size: 13px; }
+.fortune-banner-text span { font-size: 11px; color: rgba(255,255,255,0.8); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fortune-banner-cta {
+  margin-left: 4px; padding: 5px 10px; flex-shrink: 0;
+  background: #fff; color: #9d174d;
+  border-radius: 10px; font-size: 12px; font-weight: 800;
+}
+.fortune-banner--done { background: linear-gradient(120deg, rgba(30,27,75,0.9), rgba(76,29,149,0.85)); border-color: rgba(167,139,250,0.5); box-shadow: none; }
+.fortune-banner--done::after { display: none; }
+.fortune-banner--done .fortune-banner-icon { animation: none; }
+.fortune-banner--done .fortune-banner-cta { background: rgba(255,255,255,0.15); color: #fff; }
+
+@keyframes fortune-shimmer { 0%, 55% { left: -60%; } 100% { left: 130%; } }
+@keyframes fortune-wobble {
+  0%, 100% { transform: rotate(0) scale(1); }
+  25% { transform: rotate(-10deg) scale(1.08); }
+  50% { transform: rotate(8deg) scale(1); }
+}
+
+/* ── 오늘의 출근 운세: 모달 ─────────────────────────────────── */
+.fortune-overlay {
+  position: fixed; inset: 0; z-index: 1400;
+  background: rgba(2,6,23,0.78);
+  backdrop-filter: blur(6px);
+  overflow-y: auto;
+  display: flex; padding: 32px 16px;
+}
+.fortune-overlay[hidden] { display: none; }
+.fortune-stage {
+  margin: auto;
+  display: flex; flex-direction: column; align-items: center; gap: 14px;
+  perspective: 1200px;
+}
+.fortune-close {
+  padding: 9px 28px;
+  background: rgba(255,255,255,0.1); color: #e2e8f0;
+  border: 1px solid rgba(255,255,255,0.2); border-radius: 20px;
+  font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.fortune-close:hover { background: rgba(255,255,255,0.2); }
+
+/* 카드 뒷면 */
+.fortune-back {
+  position: relative;
+  width: min(300px, calc(100vw - 32px)); height: 400px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+  background:
+    radial-gradient(circle at 50% 38%, rgba(244,114,182,0.35), transparent 55%),
+    linear-gradient(160deg, #2e1065, #4c1d95 50%, #831843);
+  border: 2px solid rgba(251,207,232,0.5);
+  border-radius: 22px;
+  color: #fff; font-family: inherit; cursor: pointer;
+  box-shadow: 0 20px 60px rgba(76,29,149,0.6), inset 0 0 0 6px rgba(255,255,255,0.04);
+  transition: transform .2s;
+}
+.fortune-back[hidden] { display: none; }
+.fortune-back:hover { transform: translateY(-4px) rotate(-1deg); }
+.fortune-orb { font-size: 84px; filter: drop-shadow(0 0 24px rgba(244,114,182,0.8)); animation: fortune-float 3s ease-in-out infinite; }
+.fortune-back-title { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; }
+.fortune-back-sub { font-size: 13px; color: rgba(255,255,255,0.75); padding: 0 24px; text-align: center; }
+.fortune-sparkle { position: absolute; color: #fbcfe8; animation: fortune-twinkle 2s ease-in-out infinite; }
+.fortune-sparkle.s1 { top: 40px; left: 44px; font-size: 18px; }
+.fortune-sparkle.s2 { top: 90px; right: 40px; font-size: 24px; animation-delay: .6s; }
+.fortune-sparkle.s3 { bottom: 70px; left: 60px; font-size: 14px; animation-delay: 1.2s; }
+.fortune-back.is-opening { animation: fortune-shake .9s ease-in-out; cursor: wait; }
+.fortune-back.is-opening .fortune-orb { animation: fortune-charge .9s ease-in forwards; }
+
+@keyframes fortune-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+@keyframes fortune-twinkle { 0%, 100% { opacity: .2; transform: scale(.8); } 50% { opacity: 1; transform: scale(1.2); } }
+@keyframes fortune-shake {
+  0%, 100% { transform: rotate(0); }
+  15% { transform: rotate(-3deg) scale(1.02); }
+  30% { transform: rotate(3deg) scale(1.03); }
+  45% { transform: rotate(-4deg) scale(1.04); }
+  60% { transform: rotate(4deg) scale(1.05); }
+  80% { transform: rotate(-2deg) scale(1.06); }
+}
+@keyframes fortune-charge {
+  to { transform: scale(1.5); filter: drop-shadow(0 0 48px rgba(255,255,255,1)) brightness(1.4); }
+}
+
+/* 카드 앞면 (결과) — 캡처하기 좋게 불투명·고정 폭 */
+.fortune-card {
+  --grade: #f59e0b;
+  width: min(360px, calc(100vw - 32px));
+  padding: 20px 18px 14px;
+  background: linear-gradient(170deg, #1e1b4b 0%, #0f172a 55%, #1e1b4b 100%);
+  border: 2px solid color-mix(in srgb, var(--grade) 60%, transparent);
+  border-radius: 22px;
+  color: #f1f5f9;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5), 0 0 40px color-mix(in srgb, var(--grade) 25%, transparent);
+  display: flex; flex-direction: column; gap: 12px;
+}
+.fortune-card[hidden] { display: none; }
+.fortune-card.is-revealed { animation: fortune-flip-in .7s cubic-bezier(.2,.9,.3,1.2) both; }
+
+@keyframes fortune-flip-in {
+  from { opacity: 0; transform: rotateY(90deg) scale(.85); }
+  to   { opacity: 1; transform: rotateY(0) scale(1); }
+}
+
+.fc-head { display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: #a5b4fc; }
+.fc-brand { font-weight: 800; }
+.fc-hero {
+  text-align: center; padding: 14px 10px 12px;
+  background: radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--grade) 30%, transparent), transparent 70%);
+  border-radius: 14px;
+}
+.fc-name { font-size: 12px; color: #a5b4fc; margin-bottom: 8px; }
+.fc-headline {
+  font-size: 21px; font-weight: 900; line-height: 1.35; letter-spacing: -0.03em;
+  color: #fff; word-break: keep-all;
+}
+.fc-total { font-size: 12px; color: #cbd5e1; margin-top: 10px; }
+.fc-total b { font-size: 22px; color: var(--grade); margin-left: 4px; font-variant-numeric: tabular-nums; }
+.fc-total small { font-size: 11px; color: #64748b; }
+.fc-message {
+  font-size: 13px; line-height: 1.6; color: #e2e8f0;
+  padding: 10px 12px;
+  background: rgba(255,255,255,0.05);
+  border-left: 3px solid var(--grade);
+  border-radius: 0 10px 10px 0;
+}
+
+.fc-stats { display: flex; flex-direction: column; gap: 8px; }
+.fc-stat {
+  display: grid; grid-template-columns: 74px 1fr 28px; align-items: center; column-gap: 8px;
+}
+.fc-stat-label { font-size: 12px; font-weight: 700; white-space: nowrap; }
+.fc-stat-bar { height: 8px; background: rgba(255,255,255,0.08); border-radius: 4px; overflow: hidden; }
+.fc-stat-fill {
+  display: block; height: 100%; width: var(--w);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--grade) 55%, #6366f1), var(--grade));
+  border-radius: 4px;
+}
+.fc-stat-score { font-size: 13px; text-align: right; font-variant-numeric: tabular-nums; }
+.fc-stat-comment { grid-column: 2 / 4; font-size: 11px; color: #94a3b8; margin-top: 2px; }
+.is-revealed .fc-stat-fill { animation: fortune-fill .9s cubic-bezier(.2,.8,.2,1) both; animation-delay: calc(400ms + var(--i) * 120ms); }
+@keyframes fortune-fill { from { width: 0; } }
+.is-revealed .fc-stat { animation: fortune-rise .45s ease-out both; animation-delay: calc(300ms + var(--i) * 120ms); }
+@keyframes fortune-rise { from { opacity: 0; transform: translateY(6px); } }
+
+.fc-lucky { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.fc-lucky > div {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 7px 10px;
+  background: rgba(255,255,255,0.05); border-radius: 10px;
+}
+.fc-lucky .fc-wide { grid-column: 1 / -1; }
+.fc-lucky span { font-size: 10px; color: #94a3b8; }
+.fc-lucky b { font-size: 13px; }
+
+.fc-box {
+  font-size: 12.5px; line-height: 1.5;
+  padding: 8px 12px;
+  background: rgba(255,255,255,0.05); border-radius: 10px;
+}
+.fc-box span { display: block; font-size: 10px; font-weight: 700; color: #94a3b8; margin-bottom: 2px; }
+.fc-box--mission { background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.25); }
+.fc-box--mission span { color: #86efac; }
+.fc-box--caution { background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.22); }
+.fc-box--caution span { color: #fca5a5; }
+
+.fc-foot {
+  display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap;
+  padding-top: 8px; border-top: 1px dashed rgba(255,255,255,0.12);
+  font-size: 10px; color: #64748b;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fortune-banner::after, .fortune-banner-icon, .fortune-orb, .fortune-sparkle { animation: none; }
+}
+
+@media (max-width: 768px) {
+  /* 배너: 상단 바 아래 좌측, 우측 나침반 자리는 비워 둠 */
+  .fortune-banner {
+    top: calc(env(safe-area-inset-top, 0px) + 58px);
+    left: 8px; right: 88px; transform: none;
+    padding: 7px 8px 7px 10px;
+  }
+  .fortune-banner:hover { transform: none; }
+  .fortune-banner-text { flex: 1; }
+  /* 채팅 로그는 배너 아래로 */
+  .chat-log { top: calc(env(safe-area-inset-top, 0px) + 112px); }
+  .fortune-overlay { padding: 20px 12px; }
+}
